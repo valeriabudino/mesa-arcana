@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EstadoSesion;
 use App\Enums\TipoTirada;
+use App\Exceptions\AccionFueraDeOrden;
 use Database\Factories\SesionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -84,6 +85,33 @@ class Sesion extends Model
     public function cartas(): HasMany
     {
         return $this->hasMany(SesionCarta::class)->orderBy('posicion');
+    }
+
+    /**
+     * Único lugar donde cambia el estado: valida contra la máquina de estados.
+     * No guarda; lo hace quien llama (LecturaService, dentro de su transacción).
+     *
+     * @throws AccionFueraDeOrden
+     */
+    public function pasarA(EstadoSesion $nuevo): void
+    {
+        if (! $this->estado->puedePasarA($nuevo)) {
+            throw AccionFueraDeOrden::transicion($this->estado, $nuevo);
+        }
+
+        $this->estado = $nuevo;
+    }
+
+    /**
+     * Para acciones que no cambian de estado (elegir, revelar): exige estar en uno concreto.
+     *
+     * @throws AccionFueraDeOrden
+     */
+    public function exigirEstado(EstadoSesion $esperado): void
+    {
+        if ($this->estado !== $esperado) {
+            throw new AccionFueraDeOrden("Esto se puede hacer solo en «{$esperado->etiqueta()}» y la sesión está en «{$this->estado->etiqueta()}».");
+        }
     }
 
     public function esTarotista(User $user): bool

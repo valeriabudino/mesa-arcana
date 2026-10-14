@@ -7,6 +7,7 @@ use App\Models\Sesion;
 use App\Services\LecturaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -30,14 +31,36 @@ class SesionController extends Controller
         return redirect()->route('sesiones.show', $sesion);
     }
 
-    /** Entrar a la mesa: la primera consultante que abre el link queda asociada. */
+    /**
+     * Sin login: formulario "¿Cómo te llamás?".
+     * Con login: entra a la mesa (y si es una consultante y la sesión está libre, queda asociada).
+     */
     public function show(Request $request, Sesion $sesion): View
     {
+        if ($request->user() === null) {
+            return view('sesiones.ingresar', ['sesion' => $sesion->load('tarotista')]);
+        }
+
         $sesion = $this->lectura->entrar($sesion, $request->user());
 
         return view('sesiones.mesa', [
             'sesion' => $sesion->load('tarotista', 'consultante'),
         ]);
+    }
+
+    /** La consultante entra solo con su nombre. */
+    public function ingresar(Request $request, Sesion $sesion): RedirectResponse
+    {
+        $datos = $request->validate([
+            'nombre' => ['required', 'string', 'max:40'],
+        ]);
+
+        $invitada = $this->lectura->ingresarInvitada($sesion, $datos['nombre']);
+
+        Auth::login($invitada);
+        $request->session()->regenerate();
+
+        return redirect()->route('sesiones.show', $sesion);
     }
 
     public function resumen(Sesion $sesion): View

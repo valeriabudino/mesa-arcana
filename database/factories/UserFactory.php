@@ -45,6 +45,17 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => ['rol' => Rol::Consultante]);
     }
 
+    /** Consultante que entró solo con su nombre: sin email ni contraseña. */
+    public function invitada(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'rol' => Rol::Consultante,
+            'email' => null,
+            'email_verified_at' => null,
+            'password' => null,
+        ]);
+    }
+
     /**
      * Indicate that the model's email address should be unverified.
      */

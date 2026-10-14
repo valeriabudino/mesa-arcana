@@ -17,8 +17,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(CartaSeeder::class);
 
-        // Usuarias de prueba (contraseña: password)
+        // Tarotista de prueba (contraseña: password). Las consultantes no tienen cuenta: entran con su nombre.
         User::factory()->tarotista()->create(['name' => 'Valeria', 'email' => 'tarotista@mesa.test']);
-        User::factory()->consultante()->create(['name' => 'María', 'email' => 'consultante@mesa.test']);
     }
 }

@@ -16,14 +16,27 @@ class SesionPolicy
         return $user->esTarotista();
     }
 
-    /** Entrar a la mesa: participantes, o la primera consultante que abre el link. */
-    public function entrar(User $user, Sesion $sesion): bool
+    /**
+     * Ver /s/{uuid}: participantes, o cualquiera (con o sin login) si la sesión
+     * todavía no tiene consultante. ?User: Laravel también la llama para visitantes.
+     */
+    public function entrar(?User $user, Sesion $sesion): bool
     {
+        if ($user === null) {
+            return $sesion->consultante_id === null;
+        }
+
         if ($sesion->participa($user)) {
             return true;
         }
 
         return $user->esConsultante() && $sesion->consultante_id === null;
+    }
+
+    /** Entrar solo con el nombre: visitantes sin login y sesión sin consultante. */
+    public function ingresar(?User $user, Sesion $sesion): bool
+    {
+        return $user === null && $sesion->consultante_id === null;
     }
 
     public function mezclar(User $user, Sesion $sesion): bool

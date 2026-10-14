@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\EstadoSesion;
+use App\Enums\Rol;
 use App\Enums\TipoTirada;
 use App\Events\CartaElegida;
 use App\Events\CartaRevelada;
@@ -35,7 +36,8 @@ class LecturaService
     }
 
     /**
-     * Entrar a la mesa. La primera consultante que abre el link queda asociada (Esperando → Lista).
+     * Una consultante ya logueada (invitada de antes) abre el link.
+     * Si la sesión está libre, queda asociada (Esperando → Lista).
      */
     public function entrar(Sesion $sesion, User $user): Sesion
     {
@@ -43,7 +45,31 @@ class LecturaService
             return $sesion;
         }
 
-        $sesion = DB::transaction(function () use ($sesion, $user) {
+        return $this->asociarConsultante($sesion, fn () => $user)[0];
+    }
+
+    /**
+     * Una visitante entra solo con su nombre: se crea la usuaria invitada
+     * DENTRO del lock, así nunca quedan invitadas huérfanas si dos entran a la vez.
+     */
+    public function ingresarInvitada(Sesion $sesion, string $nombre): User
+    {
+        return $this->asociarConsultante($sesion, function () use ($nombre) {
+            $invitada = new User(['name' => $nombre]);
+            $invitada->rol = Rol::Consultante;
+            $invitada->save();
+
+            return $invitada;
+        })[1];
+    }
+
+    /**
+     * @param  callable(): User  $consultante
+     * @return array{0: Sesion, 1: User}
+     */
+    private function asociarConsultante(Sesion $sesion, callable $consultante): array
+    {
+        [$sesion, $user] = DB::transaction(function () use ($sesion, $consultante) {
             $s = $this->bloquear($sesion);
 
             // Otra consultante pudo haber entrado mientras esperábamos el lock.
@@ -51,16 +77,17 @@ class LecturaService
                 throw new AuthorizationException('Esta lectura ya tiene consultante.');
             }
 
+            $user = $consultante();
             $s->consultante_id = $user->id;
             $s->pasarA(EstadoSesion::Lista);
             $s->save();
 
-            return $s;
+            return [$s, $user];
         });
 
         broadcast(new ConsultanteIngreso($sesion->uuid, $user->name));
 
-        return $sesion;
+        return [$sesion, $user];
     }
 
     /**

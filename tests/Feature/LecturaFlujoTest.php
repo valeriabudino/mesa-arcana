@@ -38,8 +38,11 @@ it('recorre la lectura completa de punta a punta', function () {
     $sesion = Sesion::sole();
     expect($sesion->estado)->toBe(EstadoSesion::Esperando);
 
-    // Entra la consultante
-    $this->actingAs($this->consultante)->get(route('sesiones.show', $sesion))->assertOk();
+    // La consultante abre el link sin cuenta y entra solo con su nombre
+    auth()->logout();
+    $this->get(route('sesiones.show', $sesion))->assertOk()->assertSee('¿Cómo te llamás?');
+    $this->post(route('sesiones.ingresar', $sesion), ['nombre' => 'María'])->assertRedirect(route('sesiones.show', $sesion));
+    $this->consultante = User::firstWhere('name', 'María');
     expect($sesion->fresh()->estado)->toBe(EstadoSesion::Lista)
         ->and($sesion->fresh()->consultante_id)->toBe($this->consultante->id);
     Event::assertDispatched(ConsultanteIngreso::class);
@@ -103,10 +106,10 @@ describe('403: no sos vos', function () {
         $this->actingAs($this->consultante)->post(route('sesiones.store'), ['tipo_tirada' => 'si_no'])->assertForbidden();
     });
 
-    it('sin login redirige al login', function () {
+    it('sin login, las acciones de la mesa redirigen al login', function (string $ruta) {
         $sesion = Sesion::factory()->create();
-        $this->get(route('sesiones.show', $sesion))->assertRedirect(route('login'));
-    });
+        $this->post(route($ruta, $sesion))->assertRedirect(route('login'));
+    })->with(['sesiones.mezclar', 'sesiones.elegir', 'sesiones.revelar', 'sesiones.finalizar']);
 });
 
 describe('409: no es el momento', function () {

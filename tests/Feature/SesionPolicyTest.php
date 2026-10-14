@@ -4,6 +4,7 @@ use App\Enums\EstadoSesion;
 use App\Exceptions\AccionFueraDeOrden;
 use App\Models\Sesion;
 use App\Models\User;
+use App\Policies\SesionPolicy;
 
 beforeEach(function () {
     $this->consultante = User::factory()->consultante()->create();
@@ -37,6 +38,17 @@ it('una consultante cualquiera entra solo si la sesión no tiene consultante', f
         ->and($this->otraConsultante->can('entrar', $this->sesion))->toBeFalse()
         ->and($this->otraTarotista->can('entrar', $libre))->toBeFalse()
         ->and($this->consultante->can('entrar', $this->sesion))->toBeTrue();
+});
+
+it('una visitante sin login puede entrar e ingresar solo si la sesión está libre', function () {
+    $libre = Sesion::factory()->create();
+    $policy = new SesionPolicy;
+
+    expect($policy->entrar(null, $libre))->toBeTrue()
+        ->and($policy->ingresar(null, $libre))->toBeTrue()
+        ->and($policy->entrar(null, $this->sesion))->toBeFalse()
+        ->and($policy->ingresar(null, $this->sesion))->toBeFalse()
+        ->and($policy->ingresar($this->otraConsultante, $libre))->toBeFalse(); // con login no se usa el formulario
 });
 
 it('pasarA cambia el estado si la transición es válida', function () {

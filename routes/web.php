@@ -18,11 +18,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Lecturas: {sesion} se resuelve por uuid (Sesion::getRouteKeyName)
+
+// La consultante abre el link y entra solo con su nombre (sin cuenta).
+Route::get('s/{sesion}', [SesionController::class, 'show'])->name('sesiones.show')->can('entrar', 'sesion');
+Route::post('s/{sesion}/ingresar', [SesionController::class, 'ingresar'])->name('sesiones.ingresar')
+    ->can('ingresar', 'sesion')
+    ->middleware('throttle:10,1'); // como mucho 10 intentos por minuto: nadie crea invitadas en masa
+
 Route::middleware('auth')->group(function () {
     Route::post('sesiones', [SesionController::class, 'store'])->name('sesiones.store')->can('create', Sesion::class);
 
     Route::prefix('s/{sesion}')->name('sesiones.')->group(function () {
-        Route::get('/', [SesionController::class, 'show'])->name('show')->can('entrar', 'sesion');
         Route::get('resumen', [SesionController::class, 'resumen'])->name('resumen')->can('verResumen', 'sesion');
 
         Route::post('mezclar', [LecturaController::class, 'mezclar'])->name('mezclar')->can('mezclar', 'sesion');

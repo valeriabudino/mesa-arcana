@@ -1,0 +1,6 @@
+Mazo Rider-Waite-Smith (Pamela Colman Smith y A. E. Waite, Rider & Son, 1909).
+Dominio público. Escaneos obtenidos de Wikimedia Commons:
+archivos «RWS Tarot NN Nombre.jpg» y «Wands/Cups/Swords/PentsNN.jpg» de https://commons.wikimedia.org
+
+Convertidas a WebP de 600 px de alto para Mesa Arcana (TP Programación IV, UTN Formosa).
+Nombres: mayor-00..21 · {bastos|copas|espadas|oros}-01..14 (11 sota, 12 caballero, 13 reina, 14 rey).

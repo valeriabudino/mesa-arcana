@@ -15,11 +15,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(CartaSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Usuarias de prueba (contraseña: password)
+        User::factory()->tarotista()->create(['name' => 'Valeria', 'email' => 'tarotista@mesa.test']);
+        User::factory()->consultante()->create(['name' => 'María', 'email' => 'consultante@mesa.test']);
     }
 }

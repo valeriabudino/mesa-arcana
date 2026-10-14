@@ -30,6 +30,17 @@
                 placeholder="email@example.com"
             />
 
+            <!-- Rol -->
+            <flux:radio.group name="rol" :label="__('¿Cómo vas a usar Mesa Arcana?')" variant="segmented">
+                @foreach (\App\Enums\Rol::cases() as $rol)
+                    <flux:radio
+                        :value="$rol->value"
+                        :label="$rol->etiqueta()"
+                        :checked="old('rol', \App\Enums\Rol::Consultante->value) === $rol->value"
+                    />
+                @endforeach
+            </flux:radio.group>
+
             <!-- Password -->
             <flux:input
                 name="password"

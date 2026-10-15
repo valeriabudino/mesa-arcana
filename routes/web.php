@@ -1,10 +1,13 @@
 <?php
 
 use App\Enums\TipoLectura;
+use App\Http\Controllers\AtencionController;
 use App\Http\Controllers\ConsultaController;
+use App\Http\Controllers\EsperaController;
 use App\Http\Controllers\LecturaController;
 use App\Http\Controllers\RemoteStyleController;
 use App\Models\Carta;
+use App\Models\Turno;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
@@ -30,12 +33,31 @@ if (app()->isLocal()) {
     ]))->name('laboratorio-mesa');
 }
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+// Fortify manda acá después del login: cada rol a su lugar.
+Route::get('dashboard', fn () => redirect()->route(auth()->user()->esTarotista() ? 'atencion' : 'espera'))
+    ->middleware('auth')->name('dashboard');
+
+// Sala de espera (consultante). Sin login muestra "¿Cómo te llamás?".
+Route::get('espera', [EsperaController::class, 'show'])->name('espera');
+Route::post('turnos', [EsperaController::class, 'store'])->name('turnos.store')
+    ->middleware('throttle:10,1'); // como mucho 10 por minuto: nadie crea invitadas en masa
+
+Route::middleware('auth')->group(function () {
+    Route::get('espera/estado', [EsperaController::class, 'estado'])->name('espera.estado');
+    // El uuid del turno es público (viaja en sala-espera): la policy exige ser la dueña.
+    Route::post('turnos/{turno}/cancelar', [EsperaController::class, 'cancelar'])->name('turnos.cancelar')->can('cancelar', 'turno');
+
+    // Panel de atención (tarotista)
+    Route::middleware('can:viewAny,'.Turno::class)->group(function () {
+        Route::get('atencion', [AtencionController::class, 'show'])->name('atencion');
+        Route::get('atencion/cola', [AtencionController::class, 'cola'])->name('atencion.cola');
+        Route::post('atencion/disponible', [AtencionController::class, 'disponible'])->name('atencion.disponible');
+    });
+    Route::post('turnos/{turno}/tomar', [AtencionController::class, 'tomar'])->name('turnos.tomar')->can('tomar', 'turno');
 });
 
-// Sala privada: {consulta} se resuelve por uuid. La sala de espera y el panel
-// de atención (cómo se llega acá) llegan en la Fase 2.
+// Sala privada: {consulta} se resuelve por uuid. Se llega desde la sala de espera
+// (TuTarotistaTeEspera) o desde el panel de atención (Atender).
 Route::middleware('auth')->prefix('c/{consulta}')->name('consultas.')->scopeBindings()->group(function () {
     Route::get('/', [ConsultaController::class, 'show'])->name('show')->can('ver', 'consulta');
     Route::get('estado', [ConsultaController::class, 'estado'])->name('estado')->can('ver', 'consulta');

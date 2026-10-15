@@ -11,6 +11,8 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/mesa/laboratorio.js',
                 'resources/js/mesa/mesa.js',
+                'resources/js/espera/salaEspera.js',
+                'resources/js/espera/panelAtencion.js',
             ],
             refresh: true,
             fonts: [

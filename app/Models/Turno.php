@@ -61,4 +61,37 @@ class Turno extends Model
     {
         return $this->hasOne(Consulta::class);
     }
+
+    public function esDe(User $user): bool
+    {
+        return $this->consultante_id === $user->id;
+    }
+
+    /**
+     * Lo ÚNICO que las tarotistas ven de un turno: lo usan el evento TurnoCreado
+     * y GET /atencion/cola, así el panel y el evento no pueden divergir.
+     * Nada de ids internos ni email.
+     *
+     * @return array{uuid: string, nombre: string, motivo: string|null, desde: string}
+     */
+    public function datosParaTarotistas(): array
+    {
+        return [
+            'uuid' => $this->uuid,
+            'nombre' => $this->consultante->name,
+            'motivo' => $this->motivo,
+            'desde' => $this->created_at->toIso8601String(),
+        ];
+    }
+
+    /**
+     * La fila, en orden de llegada: solo los uuids de los turnos que esperan.
+     * Es lo que viaja por el canal PÚBLICO: no dice nada de nadie.
+     *
+     * @return list<string>
+     */
+    public static function uuidsEnEspera(): array
+    {
+        return static::where('estado', EstadoTurno::Esperando)->orderBy('created_at')->orderBy('id')->pluck('uuid')->all();
+    }
 }

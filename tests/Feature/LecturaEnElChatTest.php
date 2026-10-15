@@ -17,6 +17,7 @@ use App\Models\Ciudad;
 use App\Models\Consulta;
 use App\Models\Lectura;
 use App\Models\Mensaje;
+use App\Models\Pregunta;
 use Database\Seeders\CartaSeeder;
 use Database\Seeders\CiudadSeeder;
 use Illuminate\Support\Facades\Event;
@@ -34,7 +35,13 @@ beforeEach(function () {
 
 function pedirOtra(string $servicio = 'si_no')
 {
-    return test()->actingAs(test()->consultante)->postJson(route('consultas.pedidos', test()->consulta), ['servicio' => $servicio, 'pregunta' => null]);
+    $pregunta = match ($servicio) {
+        'carta_astral' => null,
+        'si_no' => Pregunta::factory()->siNo()->create()->id,
+        default => Pregunta::factory()->create()->id,
+    };
+
+    return test()->actingAs(test()->consultante)->postJson(route('consultas.pedidos', test()->consulta), ['servicio' => $servicio, 'pregunta_id' => $pregunta]);
 }
 
 function elPedido(): Mensaje

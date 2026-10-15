@@ -19,7 +19,6 @@ class LecturaFactory extends Factory
         return [
             'consulta_id' => Consulta::factory(),
             'tipo' => TipoLectura::TresCartas,
-            'pregunta' => fake()->optional()->sentence(),
         ];
     }
 

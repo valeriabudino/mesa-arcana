@@ -30,6 +30,12 @@ enum TipoLectura: string
         return $this !== self::CartaAstral;
     }
 
+    /** ¿Lleva una pregunta predeterminada? Las tiradas y el sí o no sí; la carta astral no. */
+    public function llevaPregunta(): bool
+    {
+        return $this->esDeCartas();
+    }
+
     /** ¿Se pueden pedir cartas aclaratorias? (En el sí o no la respuesta es una sola.) */
     public function admiteAclaratorias(): bool
     {

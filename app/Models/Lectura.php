@@ -21,7 +21,8 @@ use Illuminate\Support\Carbon;
  * @property int $consulta_id
  * @property TipoLectura $tipo
  * @property EstadoLectura $estado
- * @property string|null $pregunta
+ * @property int|null $pregunta_id
+ * @property-read Pregunta|null $pregunta
  * @property int $cartas_esperadas (las de la tirada + 1 por cada aclaratoria aceptada)
  * @property int|null $aclarando (posición que se está aclarando mientras se elige)
  * @property list<int>|null $orden_mazo (solo tiradas)
@@ -31,7 +32,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $cerrada_at
  */
-#[Fillable(['tipo', 'pregunta'])] // estado, orden_mazo y resultado los manejan solo los servicios
+#[Fillable(['tipo', 'pregunta_id'])] // estado, orden_mazo y resultado los manejan solo los servicios
 #[Hidden(['orden_mazo'])] // NUNCA se serializa: ni en eventos ni en vistas
 class Lectura extends Model
 {
@@ -59,6 +60,12 @@ class Lectura extends Model
         });
     }
 
+    /** @return BelongsTo<Pregunta, $this> */
+    public function pregunta(): BelongsTo
+    {
+        return $this->belongsTo(Pregunta::class);
+    }
+
     /** @return BelongsTo<Consulta, $this> */
     public function consulta(): BelongsTo
     {
@@ -76,7 +83,7 @@ class Lectura extends Model
             'id' => $this->id,
             'tipo' => $this->tipo->value,
             'estado' => $this->estado->value,
-            'pregunta' => $this->pregunta,
+            'pregunta' => $this->pregunta?->texto,
             'cartas_esperadas' => $this->cartas_esperadas, // cuántas se eligen (la tirada + aclaratorias)
         ];
     }

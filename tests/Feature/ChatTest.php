@@ -27,7 +27,7 @@ it('el payload trae lo justo para dibujarlo: ni user_id ni email', function () {
     Event::assertDispatched(MensajeEnviado::class, function (MensajeEnviado $evento) {
         $payload = $evento->broadcastWith();
 
-        expect(array_keys($payload))->toBe(['id', 'tipo', 'autor', 'contenido', 'servicio', 'estado_pedido', 'ancla', 'creado'])
+        expect(array_keys($payload))->toBe(['id', 'tipo', 'autor', 'contenido', 'servicio', 'estado_pedido', 'pregunta', 'ancla', 'creado'])
             ->and($payload['autor'])->toBe(['rol' => 'consultante', 'nombre' => 'María'])
             ->and($evento->broadcastOn()[0]->name)->toBe('presence-consulta.'.$this->consulta->uuid);
 

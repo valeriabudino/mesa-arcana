@@ -65,8 +65,8 @@ const hud = crearHud(config, {
         if (siguiente) accion(urlLectura('revelar'), { posicion: siguiente.posicion });
     },
     alCerrarLectura: () => accion(urlLectura('cerrar')),
-    alPedir: (servicio, pregunta) => accion(config.rutas.pedidos, { servicio, pregunta: pregunta || null }),
-    alPedirAclaratoria: (posicion, pregunta) => accion(urlLectura('aclaratoria'), { posicion, pregunta: pregunta || null }),
+    alPedir: (servicio, preguntaId) => accion(config.rutas.pedidos, { servicio, pregunta_id: preguntaId }),
+    alPedirAclaratoria: (posicion) => accion(urlLectura('aclaratoria'), { posicion }),
     alCancelarPedido: () => {
         const pedido = chat.pedidoPendiente();
         if (pedido !== null) accion(`${config.rutas.pedidos}/${pedido}/cancelar`);

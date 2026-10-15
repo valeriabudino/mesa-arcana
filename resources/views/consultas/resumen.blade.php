@@ -16,7 +16,7 @@
             <section class="space-y-4">
                 <h2 class="text-lg font-semibold text-[#C9A54C]">{{ $lectura->tipo->nombre() }}</h2>
                 @if ($lectura->pregunta)
-                    <p class="italic text-[#F3EBDD]/80">«{{ $lectura->pregunta }}»</p>
+                    <p class="italic text-[#F3EBDD]/80">{{ $lectura->pregunta->tema->icono }} «{{ $lectura->pregunta->texto }}»</p>
                 @endif
 
                 @if ($lectura->tipo === \App\Enums\TipoLectura::CartaAstral)

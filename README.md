@@ -68,8 +68,9 @@ Se necesitan dos personas, así que usá **dos navegadores** (o una ventana norm
 2. **Consulta:** en el otro navegador, tocá **Quiero una consulta**, escribí un nombre y entrá a la fila.
    Quien consulta no necesita cuenta.
 3. **Tarotista:** tocá **Atender**. Se abre la sala para las dos personas.
-4. **Consulta:** pedí una lectura desde la barra de abajo. La tarotista la acepta en el chat,
-   mezcla, y quien consulta elige sus cartas del abanico.
+4. **Consulta:** pedí una lectura desde la barra de abajo: elegí el servicio, un tema y una de
+   sus preguntas (no hay pregunta libre). La tarotista la acepta en el chat, mezcla, y quien
+   consulta elige sus cartas del abanico. Las cartas reveladas aparecen en el chat.
 
 Para crear otra cuenta de tarotista:
 

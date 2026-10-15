@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\TipoLectura;
 use App\Models\Consulta;
 use App\Models\Mensaje;
+use App\Models\Pregunta;
 use App\Services\ChatService;
 use App\Services\ConsultaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /** El chat de la sala: mensajes y pedidos de servicio. Responde 204: lo nuevo llega por Reverb. */
 class ChatController extends Controller
@@ -40,12 +42,20 @@ class ChatController extends Controller
 
     public function pedir(Request $request, Consulta $consulta): Response
     {
+        // Sin texto libre (plan v3 §13.1): las tiradas y el sí o no llevan una pregunta de la
+        // lista que corresponda a ese servicio; la carta astral no lleva pregunta.
         $datos = $request->validate([
             'servicio' => ['required', Rule::enum(TipoLectura::class)],
-            'pregunta' => ['nullable', 'string', 'max:500'],
+            'pregunta_id' => ['nullable', 'integer'],
         ]);
+        $servicio = TipoLectura::from($datos['servicio']);
+        $pregunta = $servicio->llevaPregunta() ? Pregunta::find($datos['pregunta_id'] ?? 0) : null;
 
-        $this->chat->pedir($consulta, $request->user(), TipoLectura::from($datos['servicio']), $datos['pregunta'] ?? null);
+        if ($servicio->llevaPregunta() && ! $pregunta?->sirvePara($servicio)) {
+            throw ValidationException::withMessages(['pregunta_id' => 'Elegí una de las preguntas de la lista para este servicio.']);
+        }
+
+        $this->chat->pedir($consulta, $request->user(), $servicio, $pregunta);
 
         return response()->noContent();
     }

@@ -35,7 +35,7 @@ function tiradaAbierta(): void
 
 function pedirAclarar(int $posicion)
 {
-    return test()->actingAs(test()->consultante)->postJson(rutaLectura('aclaratoria', test()->lectura), ['posicion' => $posicion, 'pregunta' => '¿Y esto?']);
+    return test()->actingAs(test()->consultante)->postJson(rutaLectura('aclaratoria', test()->lectura), ['posicion' => $posicion]);
 }
 
 function aceptarPendiente()
@@ -113,4 +113,20 @@ describe('cuándo no se puede', function () {
         tiradaAbierta();
         $this->actingAs($this->tarotista)->postJson(rutaLectura('aclaratoria', $this->lectura), ['posicion' => 0])->assertForbidden();
     });
+});
+
+it('si la lectura se cierra con una aclaratoria pendiente, el pedido queda sin efecto y no traba otros pedidos', function () {
+    // Lo que pasó en una prueba real: pidió aclarar y, segundos después, se cerró la lectura.
+    tiradaAbierta();
+    pedirAclarar(1)->assertNoContent();
+    $pedido = Mensaje::where('estado_pedido', EstadoPedido::Pendiente)->sole();
+
+    $this->actingAs($this->tarotista)->postJson(rutaLectura('cerrar', $this->lectura))->assertNoContent();
+
+    expect($pedido->fresh()->estado_pedido)->toBe(EstadoPedido::Cancelado)
+        ->and(Mensaje::where('contenido', 'El pedido de aclaratoria quedó sin efecto: la lectura se cerró.')->exists())->toBeTrue();
+    $this->actingAs($this->tarotista)->postJson(route('consultas.pedidos.aceptar', [$this->consulta, $pedido]))->assertConflict();
+    $this->actingAs($this->consultante)->postJson(route('consultas.pedidos', $this->consulta), [
+        'servicio' => 'carta_astral',
+    ])->assertNoContent(); // ya no hay nada pendiente que lo trabe
 });

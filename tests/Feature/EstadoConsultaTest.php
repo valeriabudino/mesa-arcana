@@ -6,6 +6,7 @@ use App\Events\CartaRevelada;
 use App\Events\MazoMezclado;
 use App\Models\Consulta;
 use App\Models\Lectura;
+use App\Models\Pregunta;
 use App\Models\User;
 use Database\Seeders\CartaSeeder;
 use Illuminate\Support\Arr;
@@ -24,7 +25,9 @@ beforeEach(function () {
     $this->consulta = Consulta::factory()->create();
     $this->tarotista = $this->consulta->tarotista;
     $this->consultante = $this->consulta->consultante;
-    $this->lectura = Lectura::factory()->for($this->consulta)->create(['pregunta' => '¿Me mudo?']);
+    $this->lectura = Lectura::factory()->for($this->consulta)->create([
+        'pregunta_id' => Pregunta::factory()->create(['texto' => '¿Qué necesito saber hoy?'])->id,
+    ]);
 
     $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura));
     foreach ([5, 40, 77] as $indice) {
@@ -40,7 +43,7 @@ it('trae la lectura activa con su tipo, estado y pregunta', function () {
         ->assertJsonPath('lectura.id', $this->lectura->id)
         ->assertJsonPath('lectura.tipo', 'tres_cartas')
         ->assertJsonPath('lectura.estado', 'revelando')
-        ->assertJsonPath('lectura.pregunta', '¿Me mudo?');
+        ->assertJsonPath('lectura.pregunta', '¿Qué necesito saber hoy?');
 });
 
 it('las cartas sin revelar dicen dónde están, pero no qué carta son', function () {

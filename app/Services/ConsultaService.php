@@ -65,7 +65,7 @@ class ConsultaService
             $p->estado_pedido = EstadoPedido::Aceptado;
             $p->save();
 
-            $lectura = new Lectura(['tipo' => $p->servicio, 'pregunta' => $p->contenido !== '' ? $p->contenido : null]);
+            $lectura = new Lectura(['tipo' => $p->servicio, 'pregunta_id' => $p->pregunta_id]);
             $lectura->consulta_id = $c->id;
             $lectura->save();
 
@@ -122,7 +122,7 @@ class ConsultaService
     /** Cerrar la lectura terminada (Abierta o Calculada → Cerrada): se puede pedir otra. */
     public function cerrarLectura(Lectura $lectura): Lectura
     {
-        $lectura = DB::transaction(function () use ($lectura) {
+        [$lectura, $sinEfecto] = DB::transaction(function () use ($lectura) {
             $this->bloquear($lectura->consulta)->exigirEstado(EstadoConsulta::Activa);
             $l = Lectura::whereKey($lectura->id)->lockForUpdate()->firstOrFail();
             $l->exigirEstado(EstadoLectura::Abierta, EstadoLectura::Calculada);
@@ -130,13 +130,47 @@ class ConsultaService
             $l->cerrada_at = now();
             $l->save();
 
-            return $l;
+            return [$l, $this->anularAclaratoriasPendientes($l)];
         });
 
         $this->emitir(new EstadoCambiado($lectura->consulta->uuid, $lectura->id, EstadoLectura::Cerrada->value));
         $this->chat->sistema($lectura->consulta, "Se cerró la lectura: {$lectura->tipo->nombre()}.");
+        $this->avisarAclaratoriasAnuladas($lectura->consulta, $sinEfecto);
 
         return $lectura;
+    }
+
+    /**
+     * Una aclaratoria pendiente apunta a la lectura en curso: si esa lectura se cierra,
+     * el pedido ya no se puede aceptar (y, pendiente, trabaría cualquier otro pedido).
+     * Queda cancelado. Se llama dentro de la transacción que cierra la lectura.
+     *
+     * @return list<int> los ids de los pedidos anulados
+     */
+    private function anularAclaratoriasPendientes(Lectura $lectura): array
+    {
+        $pendientes = Mensaje::where('consulta_id', $lectura->consulta_id)
+            ->where('tipo', TipoMensaje::PedidoAclaratoria)
+            ->where('estado_pedido', EstadoPedido::Pendiente)
+            ->lockForUpdate()
+            ->get();
+        foreach ($pendientes as $pedido) {
+            $pedido->estado_pedido = EstadoPedido::Cancelado;
+            $pedido->save();
+        }
+
+        return $pendientes->pluck('id')->all();
+    }
+
+    /** @param  list<int>  $ids */
+    private function avisarAclaratoriasAnuladas(Consulta $consulta, array $ids): void
+    {
+        foreach ($ids as $id) {
+            $this->emitir(new PedidoResuelto($consulta->uuid, $id, EstadoPedido::Cancelado->value));
+        }
+        if ($ids !== []) {
+            $this->chat->sistema($consulta, 'El pedido de aclaratoria quedó sin efecto: la lectura se cerró.');
+        }
     }
 
     /**

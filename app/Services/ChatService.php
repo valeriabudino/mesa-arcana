@@ -14,6 +14,7 @@ use App\Models\Consulta;
 use App\Models\Lectura;
 use App\Models\LecturaCarta;
 use App\Models\Mensaje;
+use App\Models\Pregunta;
 use App\Models\User;
 use App\Services\Concerns\EmiteEventos;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +65,7 @@ class ChatService
      * Con la lectura ya terminada (todas las cartas a la vista, o la carta astral
      * calculada) sí: si la tarotista acepta, esa se cierra y arranca la nueva.
      */
-    public function pedir(Consulta $consulta, User $consultante, TipoLectura $servicio, ?string $pregunta): Mensaje
+    public function pedir(Consulta $consulta, User $consultante, TipoLectura $servicio, ?Pregunta $pregunta): Mensaje
     {
         $mensaje = DB::transaction(function () use ($consulta, $consultante, $servicio, $pregunta) {
             $c = Consulta::whereKey($consulta->id)->lockForUpdate()->firstOrFail();
@@ -77,9 +78,11 @@ class ChatService
                 throw new AccionFueraDeOrden('Ya hay un pedido esperando respuesta.');
             }
 
-            $mensaje = new Mensaje(['contenido' => $pregunta ?? '']);
+            // El texto de la pregunta queda también en el contenido (lo usa el resumen).
+            $mensaje = new Mensaje(['contenido' => $pregunta->texto ?? '']);
             $mensaje->consulta_id = $c->id;
             $mensaje->user_id = $consultante->id;
+            $mensaje->pregunta_id = $pregunta?->id;
             $mensaje->tipo = TipoMensaje::PedidoServicio;
             $mensaje->servicio = $servicio;
             $mensaje->estado_pedido = EstadoPedido::Pendiente;
@@ -88,7 +91,7 @@ class ChatService
             return $mensaje;
         });
 
-        $this->emitir(new MensajeEnviado($consulta->uuid, $mensaje->load('autora')));
+        $this->emitir(new MensajeEnviado($consulta->uuid, $mensaje->load('autora', 'pregunta.tema')));
 
         return $mensaje;
     }
@@ -97,11 +100,11 @@ class ChatService
      * La consultante pide una carta aclaratoria para la carta de una posición.
      * Queda anclado a esa carta (para el hilo del chat y para saber qué aclarar).
      */
-    public function pedirAclaratoria(Lectura $lectura, User $consultante, int $posicion, ?string $pregunta): Mensaje
+    public function pedirAclaratoria(Lectura $lectura, User $consultante, int $posicion): Mensaje
     {
         $consulta = $lectura->consulta;
 
-        $mensaje = DB::transaction(function () use ($consulta, $lectura, $consultante, $posicion, $pregunta) {
+        $mensaje = DB::transaction(function () use ($consulta, $lectura, $consultante, $posicion) {
             $c = Consulta::whereKey($consulta->id)->lockForUpdate()->firstOrFail();
             $c->exigirEstado(EstadoConsulta::Activa);
 
@@ -115,7 +118,7 @@ class ChatService
                 throw new AccionFueraDeOrden('Ya hay un pedido esperando respuesta.');
             }
 
-            $mensaje = new Mensaje(['contenido' => $pregunta ?? '']);
+            $mensaje = new Mensaje(['contenido' => '']); // sin texto libre: aclara la carta de esa posición
             $mensaje->consulta_id = $c->id;
             $mensaje->user_id = $consultante->id;
             $mensaje->tipo = TipoMensaje::PedidoAclaratoria;
@@ -168,7 +171,7 @@ class ChatService
     public function mensajes(Consulta $consulta, int $despues = 0): array
     {
         return $consulta->mensajes()
-            ->with(['autora', 'lectura.cartas.carta'])
+            ->with(['autora', 'lectura.cartas.carta', 'pregunta.tema'])
             ->where('id', '>', $despues)
             ->get()
             ->map(fn (Mensaje $m) => $m->datosPublicos())

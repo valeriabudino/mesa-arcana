@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property int $consulta_id
  * @property int|null $user_id (null = mensaje de sistema)
  * @property int|null $lectura_id (en las cartas reveladas y la carta astral)
+ * @property int|null $pregunta_id (en el pedido de servicio: la pregunta elegida)
  * @property TipoMensaje $tipo
  * @property string $contenido
  * @property TipoLectura|null $servicio
@@ -63,6 +64,12 @@ class Mensaje extends Model
         return $this->belongsTo(Lectura::class);
     }
 
+    /** @return BelongsTo<Pregunta, $this> */
+    public function pregunta(): BelongsTo
+    {
+        return $this->belongsTo(Pregunta::class);
+    }
+
     /**
      * Lo ÚNICO que se publica de un mensaje: lo usan el evento MensajeEnviado y
      * GET /c/{uuid}/mensajes. El contenido va tal cual se escribió (texto plano):
@@ -79,6 +86,7 @@ class Mensaje extends Model
             'contenido' => $this->contenido,
             'servicio' => $this->servicio?->value,
             'estado_pedido' => $this->estado_pedido?->value,
+            'pregunta' => $this->pregunta?->datosPublicos(), // la del pedido: tema y texto
             'ancla' => $this->ancla_tipo ? ['tipo' => $this->ancla_tipo->value, 'valor' => $this->ancla_valor] : null,
             'creado' => $this->created_at->toIso8601String(),
         ] + $this->datosDeLaLectura();

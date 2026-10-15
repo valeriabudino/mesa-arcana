@@ -6,6 +6,7 @@ use App\Enums\EstadoLectura;
 use App\Enums\TipoLectura;
 use App\Models\Ciudad;
 use App\Models\Consulta;
+use App\Models\Tema;
 use App\Models\User;
 use App\Services\CartaAstralService;
 use App\Services\ConsultaService;
@@ -49,6 +50,7 @@ class ConsultaController extends Controller
         $consulta->load([
             'tarotista', 'consultante',
             'lecturas.cartas' => fn ($q) => $q->whereNotNull('revelada_at')->with('carta'),
+            'lecturas.pregunta.tema',
             'mensajes.autora',
         ]);
 
@@ -80,6 +82,8 @@ class ConsultaController extends Controller
             // Para el formulario de nacimiento: provincia → ciudad (datos públicos).
             'ciudades' => Ciudad::orderBy('provincia')->orderBy('nombre')->get(['id', 'nombre', 'provincia']),
             'puntos' => CartaAstralService::PUNTOS,
+            // Para pedir una lectura: tema → pregunta predeterminada (plan v3 §13.1).
+            'temas' => Tema::paraElFormulario(),
             'etiquetas' => collect(EstadoLectura::cases())->mapWithKeys(fn (EstadoLectura $e) => [$e->value => $e->etiqueta()]),
             'rutas' => [
                 'estado' => route('consultas.estado', $consulta),

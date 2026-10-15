@@ -49,53 +49,65 @@ export function crearHud(config, acciones) {
     const puedeMarcarAusente = () =>
         !hud.estaConectada('consultante') && Date.now() - new Date(config.tomado_at) >= config.minutos_ausente * 60000;
 
-    /** La consultante pide un servicio: tipo + pregunta opcional. */
-    function formularioPedido() {
-        const tipo = document.createElement('select');
-        tipo.className = 'campo-chico';
-        for (const [valor, { nombre }] of Object.entries(config.tipos)) tipo.append(new Option(nombre, valor));
-        const pregunta = document.createElement('input');
-        pregunta.className = 'campo-chico w-64 max-w-full';
-        pregunta.maxLength = 500;
-        pregunta.placeholder = 'Tu pregunta (opcional)';
-
-        return [
-            texto('Pedí una lectura:'),
-            tipo,
-            pregunta,
-            boton('Pedir', () => acciones.alPedir(tipo.value, pregunta.value.trim())),
-        ];
-    }
-
     /**
-     * Con la lectura terminada, la consultante elige cómo seguir: aclarar una de las cartas
-     * (si la tirada lo admite) o pedir otra lectura. Si la tarotista acepta otra lectura,
-     * la actual se cierra sola.
+     * Pedir una lectura nueva (servicio → tema → pregunta de la lista) o, con la lectura
+     * terminada, aclarar una de sus cartas. Sin texto libre (plan v3 §13.1): la pregunta
+     * se elige, filtrada por el servicio. La carta astral no lleva pregunta.
      */
-    function formularioSiguiente(lectura, aclarables) {
-        const que = document.createElement('select');
-        que.className = 'campo-chico max-w-full';
+    function formularioPedir(etiqueta, lectura = null, aclarables = []) {
+        const campo = (tipo, clase) => Object.assign(document.createElement(tipo), { className: clase });
+        const que = campo('select', 'campo-chico max-w-full');
+        const nuevas = Object.entries(config.tipos).map(([valor, { nombre }]) => new Option(nombre, `nueva:${valor}`));
         if (aclarables.length) {
             const aclarar = Object.assign(document.createElement('optgroup'), { label: 'Aclarar una carta' });
             for (const c of aclarables) aclarar.append(new Option(`Aclarar «${config.tipos[lectura.tipo].posiciones[c.posicion]}»`, `aclarar:${c.posicion}`));
-            que.append(aclarar);
+            const otra = Object.assign(document.createElement('optgroup'), { label: 'Otra lectura' });
+            otra.append(...nuevas);
+            que.append(aclarar, otra);
+        } else {
+            que.append(...nuevas);
         }
-        const otra = Object.assign(document.createElement('optgroup'), { label: 'Otra lectura' });
-        for (const [valor, { nombre }] of Object.entries(config.tipos)) otra.append(new Option(nombre, `nueva:${valor}`));
-        que.append(otra);
-        const pregunta = document.createElement('input');
-        pregunta.className = 'campo-chico w-56 max-w-full';
-        pregunta.maxLength = 500;
-        pregunta.placeholder = 'Tu pregunta (opcional)';
+
+        const temas = campo('div', 'flex basis-full flex-wrap justify-center gap-1.5');
+        const pregunta = campo('select', 'campo-chico w-72 max-w-full');
+        const servicio = () => (que.value.startsWith('nueva:') ? que.value.slice('nueva:'.length) : null);
+        const preguntasDe = (tema, s) => tema.preguntas.filter((p) => p.servicios.includes(s));
+        let elegido = null; // slug del tema
+
+        function actualizar() {
+            const s = servicio();
+            const disponibles = s ? config.temas.filter((t) => preguntasDe(t, s).length) : [];
+            temas.hidden = pregunta.hidden = disponibles.length === 0;
+            if (!disponibles.length) return;
+            if (!disponibles.some((t) => t.slug === elegido)) elegido = disponibles[0].slug;
+
+            temas.replaceChildren(...disponibles.map((t) => {
+                const chip = campo('button', 'rounded-full border border-[#C9A54C]/50 px-2.5 py-1 text-xs aria-pressed:bg-[#C9A54C] aria-pressed:text-[#0E0B1A]');
+                chip.type = 'button';
+                chip.textContent = `${t.icono} ${t.nombre}`;
+                chip.setAttribute('aria-pressed', String(t.slug === elegido));
+                chip.addEventListener('click', () => {
+                    elegido = t.slug;
+                    actualizar();
+                });
+
+                return chip;
+            }));
+            const tema = disponibles.find((t) => t.slug === elegido);
+            pregunta.replaceChildren(...preguntasDe(tema, s).map((p) => new Option(p.texto, p.id)));
+        }
+        que.addEventListener('change', actualizar);
+        actualizar();
 
         return [
-            texto('¿Seguimos?'),
+            texto(etiqueta),
             que,
+            temas,
             pregunta,
             boton('Pedir', () => {
                 const [accion, valor] = que.value.split(':');
-                if (accion === 'aclarar') acciones.alPedirAclaratoria(Number(valor), pregunta.value.trim());
-                else acciones.alPedir(valor, pregunta.value.trim());
+                if (accion === 'aclarar') acciones.alPedirAclaratoria(Number(valor));
+                else acciones.alPedir(valor, pregunta.hidden ? null : Number(pregunta.value));
             }),
         ];
     }
@@ -175,7 +187,7 @@ export function crearHud(config, acciones) {
             } else if (pedidoPendiente) {
                 agregar(...esperandoRespuesta());
             } else {
-                agregar(...formularioPedido());
+                agregar(...formularioPedir('Pedí una lectura:'));
             }
 
             return;
@@ -197,7 +209,7 @@ export function crearHud(config, acciones) {
             } else if (pedidoPendiente) {
                 agregar(...esperandoRespuesta());
             } else {
-                agregar(texto('Tu carta está en el chat.'), ...formularioSiguiente(lectura, []));
+                agregar(texto('Tu carta está en el chat.'), ...formularioPedir('¿Seguimos?', lectura));
             }
             if (soyTarotista) agregar(boton('Finalizar consulta', acciones.alFinalizar, true));
 
@@ -229,7 +241,7 @@ export function crearHud(config, acciones) {
                     ? cartas.filter((c) => c.aclara === null && !cartas.some((o) => o.aclara === c.posicion))
                     : [];
                 if (pedidoPendiente) agregar(...esperandoRespuesta());
-                else agregar(...formularioSiguiente(lectura, aclarables));
+                else agregar(...formularioPedir('¿Seguimos?', lectura, aclarables));
             }
         }
     }

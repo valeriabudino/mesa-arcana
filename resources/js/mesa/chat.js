@@ -114,7 +114,12 @@ export function crearChat(config, { alEnviar, alResponderPedido, alEscribir, nom
                 ? config.tipos[m.servicio]?.nombre ?? m.servicio
                 : `aclarar «${nombrePosicion(Number(m.ancla?.valor)) ?? 'una carta'}»`;
             burbuja.append(nodo('p', 'font-semibold', `✦ Pidió: ${que}`));
-            if (m.contenido) burbuja.append(nodo('p', 'italic', `«${m.contenido}»`));
+            if (m.pregunta) {
+                burbuja.append(
+                    nodo('p', 'text-xs opacity-70', `${m.pregunta.tema.icono} ${m.pregunta.tema.nombre}`),
+                    nodo('p', 'italic', `«${m.pregunta.texto}»`),
+                );
+            }
 
             if (m.estado_pedido === 'pendiente' && soyTarotista) {
                 const botones = nodo('div', 'mt-2 flex gap-2');

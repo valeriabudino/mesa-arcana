@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([CartaSeeder::class, CiudadSeeder::class]);
+        $this->call([CartaSeeder::class, CiudadSeeder::class, TemaSeeder::class]);
 
         // Tarotista de prueba (contraseña: password). Las consultantes no tienen cuenta: entran con su nombre.
         User::factory()->tarotista()->create(['name' => 'Valeria', 'email' => 'tarotista@mesa.test']);

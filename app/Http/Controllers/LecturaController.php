@@ -64,12 +64,10 @@ class LecturaController extends Controller
     /** La consultante pide aclarar una carta (queda como pedido en el chat). */
     public function pedirAclaratoria(Request $request, Consulta $consulta, Lectura $lectura): Response
     {
-        $datos = $request->validate([
-            'posicion' => ['required', 'integer', 'min:0'],
-            'pregunta' => ['nullable', 'string', 'max:500'],
-        ]);
+        // Sin texto libre (plan v3 §13.1): se aclara la carta de esa posición.
+        $datos = $request->validate(['posicion' => ['required', 'integer', 'min:0']]);
 
-        $this->chat->pedirAclaratoria($lectura, $request->user(), $datos['posicion'], $datos['pregunta'] ?? null);
+        $this->chat->pedirAclaratoria($lectura, $request->user(), $datos['posicion']);
 
         return response()->noContent();
     }

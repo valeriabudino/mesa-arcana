@@ -11,6 +11,7 @@ use App\Exceptions\AccionFueraDeOrden;
 use App\Models\Carta;
 use App\Models\Lectura;
 use App\Models\LecturaCarta;
+use App\Services\Concerns\EmiteEventos;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class LecturaCartasService
 {
+    use EmiteEventos;
+
     /**
      * Mezcla en el servidor (Lista → Eligiendo). El orden real queda en orden_mazo ($hidden).
      */
@@ -37,7 +40,7 @@ class LecturaCartasService
         });
 
         // Semilla SOLO visual: un número aparte, sin relación con orden_mazo.
-        broadcast(new MazoMezclado($lectura->consulta->uuid, random_int(1, 2_147_483_647)));
+        $this->emitir(new MazoMezclado($lectura->consulta->uuid, random_int(1, 2_147_483_647)));
 
         return $lectura;
     }
@@ -72,7 +75,7 @@ class LecturaCartasService
             return [$l, $elegida];
         });
 
-        broadcast(new CartaElegida($lectura->consulta->uuid, $elegida));
+        $this->emitir(new CartaElegida($lectura->consulta->uuid, $elegida));
 
         return $elegida;
     }
@@ -104,7 +107,7 @@ class LecturaCartasService
             return [$l, $carta];
         });
 
-        broadcast(new CartaRevelada($lectura->consulta->uuid, $carta->load('carta')->setRelation('lectura', $lectura)));
+        $this->emitir(new CartaRevelada($lectura->consulta->uuid, $carta->load('carta')->setRelation('lectura', $lectura)));
 
         return $carta;
     }

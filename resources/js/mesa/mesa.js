@@ -121,6 +121,8 @@ async function accion(nombre, datos = {}) {
         await enviar(`${config.rutas.lecturas}/${mesa.lectura.id}/${nombre}`, datos);
     } catch (error) {
         hud.aviso(error.message);
+        // Lo que sea que haya pasado, la pantalla se pone al día con el servidor.
+        encolar(cargarEstado);
     } finally {
         mesa.ocupada = false;
         refrescar();

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\ConsultaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class ConsultaController extends Controller
@@ -18,12 +19,38 @@ class ConsultaController extends Controller
     /** La sala privada. */
     public function show(Request $request, Consulta $consulta): View
     {
-        $consulta->load('tarotista', 'consultante');
+        $consulta->load('tarotista', 'consultante', 'turno');
 
         return view('consultas.sala', [
             'consulta' => $consulta,
             'config' => $this->configSala($consulta, $request->user()),
         ]);
+    }
+
+    public function finalizar(Consulta $consulta): Response
+    {
+        $this->consultas->finalizar($consulta);
+
+        return response()->noContent();
+    }
+
+    public function ausente(Consulta $consulta): Response
+    {
+        $this->consultas->marcarAusente($consulta);
+
+        return response()->noContent();
+    }
+
+    /** Resumen imprimible: las lecturas con SOLO las cartas reveladas, y la conversación. */
+    public function resumen(Consulta $consulta): View
+    {
+        $consulta->load([
+            'tarotista', 'consultante',
+            'lecturas.cartas' => fn ($q) => $q->whereNotNull('revelada_at')->with('carta'),
+            'mensajes.autora',
+        ]);
+
+        return view('consultas.resumen', ['consulta' => $consulta]);
     }
 
     /** Foto de la consulta en JSON: para dibujar al entrar y para redibujar al reconectar. */
@@ -40,15 +67,23 @@ class ConsultaController extends Controller
     {
         return [
             'uuid' => $consulta->uuid,
-            'yo' => ['id' => $yo->id, 'rol' => $yo->rol->value],
+            'yo' => ['id' => $yo->id, 'rol' => $yo->rol->value, 'nombre' => $yo->name],
+            'tomado_at' => $consulta->turno->tomado_at->toIso8601String(),
+            'minutos_ausente' => ConsultaService::MINUTOS_PARA_AUSENTE,
             'tarotista' => $consulta->tarotista->name,
             'consultante' => $consulta->consultante->name,
             'tipos' => collect(TipoLectura::cases())->mapWithKeys(fn (TipoLectura $t) => [
-                $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones()],
+                $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones(), 'disponible' => $t->esDeCartas()],
             ]),
             'etiquetas' => collect(EstadoLectura::cases())->mapWithKeys(fn (EstadoLectura $e) => [$e->value => $e->etiqueta()]),
             'rutas' => [
                 'estado' => route('consultas.estado', $consulta),
+                'mensajes' => route('consultas.mensajes', $consulta),
+                'pedidos' => route('consultas.pedidos', $consulta),
+                'finalizar' => route('consultas.finalizar', $consulta),
+                'ausente' => route('consultas.ausente', $consulta),
+                'atencion' => route('atencion'),
+                'espera' => route('espera'),
                 // Las de la lectura activa: el JS arma {lecturas}/{id}/mezclar|elegir|revelar.
                 'lecturas' => route('consultas.show', $consulta).'/lecturas',
             ],

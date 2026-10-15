@@ -2,28 +2,203 @@
 
 namespace App\Services;
 
+use App\Enums\EstadoConsulta;
+use App\Enums\EstadoLectura;
+use App\Enums\EstadoPedido;
+use App\Enums\EstadoTurno;
+use App\Events\ConsultaFinalizada;
+use App\Events\EstadoCambiado;
+use App\Events\LecturaIniciada;
+use App\Events\PedidoResuelto;
+use App\Exceptions\AccionFueraDeOrden;
 use App\Models\Consulta;
+use App\Models\Lectura;
+use App\Models\Mensaje;
+use App\Models\Turno;
+use App\Services\Concerns\EmiteEventos;
+use Illuminate\Support\Facades\DB;
 
 /**
- * La sala privada. Por ahora arma la "foto" de GET /c/{uuid}/estado;
- * en la Fase 3 suma iniciar lecturas, responder pedidos y finalizar.
+ * La sala privada: responder pedidos (y así iniciar lecturas), cerrarlas y
+ * finalizar la consulta. El lock va sobre la fila de la consulta: es lo que
+ * garantiza "una lectura activa a la vez".
  */
 class ConsultaService
 {
-    public function __construct(private LecturaCartasService $cartas) {}
+    use EmiteEventos;
+
+    /** Si la consultante no entra en este tiempo, la tarotista puede marcarla ausente. */
+    public const MINUTOS_PARA_AUSENTE = 2;
+
+    public function __construct(
+        private LecturaCartasService $cartas,
+        private ChatService $chat,
+    ) {}
+
+    /**
+     * La tarotista acepta un pedido del chat: nace la lectura de ese tipo.
+     */
+    public function aceptarPedido(Mensaje $pedido): Lectura
+    {
+        [$consulta, $lectura] = DB::transaction(function () use ($pedido) {
+            [$c, $p] = $this->bloquearConPedido($pedido);
+
+            if ($c->lecturaActiva()->exists()) {
+                throw new AccionFueraDeOrden('Ya hay una lectura en curso: cerrala antes de empezar otra.');
+            }
+
+            $p->estado_pedido = EstadoPedido::Aceptado;
+            $p->save();
+
+            $lectura = new Lectura(['tipo' => $p->servicio, 'pregunta' => $p->contenido !== '' ? $p->contenido : null]);
+            $lectura->consulta_id = $c->id;
+            $lectura->save();
+
+            return [$c, $lectura];
+        });
+
+        $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Aceptado->value));
+        $this->emitir(new LecturaIniciada($consulta->uuid, $lectura));
+        $this->chat->sistema($consulta, "{$consulta->tarotista->name} aceptó: {$lectura->tipo->nombre()}.");
+
+        return $lectura;
+    }
+
+    public function rechazarPedido(Mensaje $pedido): void
+    {
+        $consulta = DB::transaction(function () use ($pedido) {
+            [$c, $p] = $this->bloquearConPedido($pedido);
+            $p->estado_pedido = EstadoPedido::Rechazado;
+            $p->save();
+
+            return $c;
+        });
+
+        $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Rechazado->value));
+        $this->chat->sistema($consulta, "{$consulta->tarotista->name} no aceptó el pedido.");
+    }
+
+    /** Cerrar la lectura terminada (Abierta o Calculada → Cerrada): se puede pedir otra. */
+    public function cerrarLectura(Lectura $lectura): Lectura
+    {
+        $lectura = DB::transaction(function () use ($lectura) {
+            $this->bloquear($lectura->consulta)->exigirEstado(EstadoConsulta::Activa);
+            $l = Lectura::whereKey($lectura->id)->lockForUpdate()->firstOrFail();
+            $l->exigirEstado(EstadoLectura::Abierta, EstadoLectura::Calculada);
+            $l->pasarA(EstadoLectura::Cerrada);
+            $l->cerrada_at = now();
+            $l->save();
+
+            return $l;
+        });
+
+        $this->emitir(new EstadoCambiado($lectura->consulta->uuid, $lectura->id, EstadoLectura::Cerrada->value));
+        $this->chat->sistema($lectura->consulta, "Se cerró la lectura: {$lectura->tipo->nombre()}.");
+
+        return $lectura;
+    }
+
+    /**
+     * La tarotista termina la consulta. Siempre se puede: si había una lectura a medias,
+     * se interrumpe (en el resumen solo aparecen las cartas reveladas).
+     */
+    public function finalizar(Consulta $consulta): Consulta
+    {
+        $consulta = DB::transaction(function () use ($consulta) {
+            $c = $this->bloquear($consulta);
+            $c->pasarA(EstadoConsulta::Finalizada);
+            $c->finalizada_at = now();
+            $c->save();
+            $this->interrumpirLectura($c);
+
+            return $c;
+        });
+
+        $this->chat->sistema($consulta, 'La consulta terminó.');
+        $this->emitir(new ConsultaFinalizada($consulta->uuid, route('consultas.resumen', $consulta)));
+
+        return $consulta;
+    }
+
+    /**
+     * La consultante nunca entró: turno Tomado → Ausente y la consulta termina,
+     * así la tarotista puede atender a la siguiente.
+     */
+    public function marcarAusente(Consulta $consulta): Consulta
+    {
+        $consulta = DB::transaction(function () use ($consulta) {
+            $c = $this->bloquear($consulta);
+            $c->exigirEstado(EstadoConsulta::Activa);
+
+            $turno = Turno::whereKey($c->turno_id)->lockForUpdate()->firstOrFail();
+            if ($turno->tomado_at->gt(now()->subMinutes(self::MINUTOS_PARA_AUSENTE))) {
+                throw new AccionFueraDeOrden('Esperá '.self::MINUTOS_PARA_AUSENTE.' minutos antes de marcarla ausente.');
+            }
+            if ($c->lecturas()->exists() || $c->mensajes()->where('user_id', $c->consultante_id)->exists()) {
+                throw new AccionFueraDeOrden('La consultante ya participó de la consulta.');
+            }
+
+            $turno->pasarA(EstadoTurno::Ausente);
+            $turno->save();
+            $c->pasarA(EstadoConsulta::Finalizada);
+            $c->finalizada_at = now();
+            $c->save();
+
+            return $c;
+        });
+
+        $this->chat->sistema($consulta, 'La consultante no llegó.');
+        $this->emitir(new ConsultaFinalizada($consulta->uuid, route('consultas.resumen', $consulta)));
+
+        return $consulta;
+    }
 
     /**
      * Foto de la consulta para dibujar al entrar y redibujar al reconectar.
+     * (Los mensajes van aparte: GET /mensajes?despues=…)
      *
-     * @return array{estado: string, lectura: array<string, mixed>|null}
+     * @return array{estado: string, lectura: array<string, mixed>|null, url_resumen: string|null}
      */
     public function estado(Consulta $consulta): array
     {
         $lectura = $consulta->lecturaActiva;
+        $finalizada = $consulta->estado === EstadoConsulta::Finalizada;
 
         return [
             'estado' => $consulta->estado->value,
             'lectura' => $lectura?->tipo->esDeCartas() ? $this->cartas->foto($lectura->setRelation('consulta', $consulta)) : null,
+            'url_resumen' => $finalizada ? route('consultas.resumen', $consulta) : null,
         ];
+    }
+
+    private function interrumpirLectura(Consulta $consulta): void
+    {
+        $lectura = $consulta->lecturaActiva()->lockForUpdate()->first();
+        if ($lectura === null) {
+            return;
+        }
+
+        $lectura->pasarA(EstadoLectura::Cerrada);
+        $lectura->cerrada_at = now();
+        $lectura->save();
+    }
+
+    private function bloquear(Consulta $consulta): Consulta
+    {
+        return Consulta::whereKey($consulta->id)->lockForUpdate()->firstOrFail();
+    }
+
+    /** @return array{0: Consulta, 1: Mensaje} */
+    private function bloquearConPedido(Mensaje $pedido): array
+    {
+        $c = $this->bloquear($pedido->consulta);
+        $c->exigirEstado(EstadoConsulta::Activa);
+
+        $p = Mensaje::whereKey($pedido->id)->lockForUpdate()->firstOrFail();
+        if ($p->estado_pedido !== EstadoPedido::Pendiente) {
+            throw new AccionFueraDeOrden('Ese pedido ya fue respondido.');
+        }
+
+        return [$c, $p];
     }
 }

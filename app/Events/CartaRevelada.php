@@ -26,6 +26,7 @@ class CartaRevelada implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return $this->lecturaCarta->datosRevelada();
+        // lectura: a qué lectura pertenece (una consulta puede tener varias)
+        return ['lectura' => $this->lecturaCarta->lectura_id] + $this->lecturaCarta->datosRevelada();
     }
 }

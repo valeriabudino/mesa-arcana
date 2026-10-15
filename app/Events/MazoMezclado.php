@@ -13,6 +13,7 @@ class MazoMezclado implements ShouldBroadcastNow
 {
     public function __construct(
         private string $uuid,
+        private int $lecturaId,
         private int $semillaAnimacion,
     ) {}
 
@@ -28,6 +29,6 @@ class MazoMezclado implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return ['semilla_animacion' => $this->semillaAnimacion];
+        return ['lectura' => $this->lecturaId, 'semilla_animacion' => $this->semillaAnimacion];
     }
 }

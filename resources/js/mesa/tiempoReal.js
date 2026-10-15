@@ -5,7 +5,12 @@ import '../echo.js';
 
 // Mismos nombres que broadcastAs() en PHP. El punto inicial le dice a Echo
 // que no les agregue el namespace App\Events (como en la guía).
-export const EVENTOS = ['MazoMezclado', 'CartaElegida', 'CartaRevelada'];
+export const EVENTOS = [
+    // la consulta y el chat
+    'MensajeEnviado', 'PedidoResuelto', 'LecturaIniciada', 'EstadoCambiado', 'ConsultaFinalizada',
+    // la mesa
+    'MazoMezclado', 'CartaElegida', 'CartaRevelada',
+];
 
 export function conectar(uuid, manejadores) {
     // join() = canal de PRESENCIA de la consulta: Laravel autoriza en routes/channels.php
@@ -17,7 +22,8 @@ export function conectar(uuid, manejadores) {
         .leaving((miembro) => manejadores.alSalir(miembro))
         .error((error) => manejadores.alError(error))
         // Whisper: cliente → Reverb → la otra persona. No pasa por Laravel ni por la base.
-        .listenForWhisper('hover', (datos) => manejadores.alHoverRemoto(datos));
+        .listenForWhisper('hover', (datos) => manejadores.alHoverRemoto(datos))
+        .listenForWhisper('escribiendo', () => manejadores.alEscribiendoRemoto());
 
     for (const nombre of EVENTOS) {
         canal.listen(`.${nombre}`, (payload) => manejadores.alEvento(nombre, payload));
@@ -28,6 +34,9 @@ export function conectar(uuid, manejadores) {
     return {
         susurrarHover(indice) {
             canal.whisper('hover', { indice });
+        },
+        susurrarEscribiendo() {
+            canal.whisper('escribiendo', {});
         },
     };
 }

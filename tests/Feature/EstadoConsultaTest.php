@@ -8,6 +8,7 @@ use App\Models\Consulta;
 use App\Models\Lectura;
 use App\Models\User;
 use Database\Seeders\CartaSeeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 
 /*
@@ -61,7 +62,8 @@ it('la carta revelada viaja igual que en los eventos CartaElegida + CartaRevelad
 
     Event::assertDispatched(CartaRevelada::class, function (CartaRevelada $evento) use ($respuesta) {
         // indice_abanico (de CartaElegida) hace falta para redibujar la mesa al recargar
-        expect($respuesta->json('lectura.cartas.1'))->toBe(['revelada' => true, 'posicion' => 1, 'indice_abanico' => 40] + $evento->broadcastWith());
+        // (sin 'lectura': en la foto las cartas ya van adentro de su lectura)
+        expect($respuesta->json('lectura.cartas.1'))->toBe(['revelada' => true, 'posicion' => 1, 'indice_abanico' => 40] + Arr::except($evento->broadcastWith(), 'lectura'));
 
         return true;
     });

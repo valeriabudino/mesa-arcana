@@ -3,9 +3,9 @@
 
 const $ = (selector) => document.querySelector(selector);
 
-function boton(texto, alTocar) {
+function boton(texto, alTocar, secundario = false) {
     const b = document.createElement('button');
-    b.className = 'boton';
+    b.className = secundario ? 'boton !bg-transparent' : 'boton';
     b.textContent = texto;
     b.addEventListener('click', alTocar);
 
@@ -20,6 +20,17 @@ function texto(contenido, clase = 'text-[#F3EBDD]/80') {
     return p;
 }
 
+function enlace(contenido, href, secundario = false) {
+    const a = document.createElement('a');
+    a.className = secundario ? 'boton !bg-transparent' : 'boton';
+    a.href = href;
+    a.textContent = contenido;
+
+    return a;
+}
+
+const desactivar = (barra, ocupada) => barra.querySelectorAll('button, select, input').forEach((el) => (el.disabled = ocupada));
+
 export function crearHud(config, acciones) {
     const soyTarotista = config.yo.rol === 'tarotista';
     const miembros = new Map(); // id → { id, name, rol }, lo que devuelve routes/channels.php
@@ -31,6 +42,32 @@ export function crearHud(config, acciones) {
             $(`[data-presencia=${rol}] i`).className = `size-2.5 rounded-full ${roles.has(rol) ? 'bg-emerald-400' : 'bg-zinc-600'}`;
         }
     };
+
+    // "No llegó": la consultante no está conectada y ya pasaron los minutos de espera.
+    const puedeMarcarAusente = () =>
+        !hud.estaConectada('consultante') && Date.now() - new Date(config.tomado_at) >= config.minutos_ausente * 60000;
+
+    /** La consultante pide un servicio: tipo + pregunta opcional. */
+    function formularioPedido() {
+        const tipo = document.createElement('select');
+        tipo.className = 'campo-chico';
+        for (const [valor, { nombre, disponible }] of Object.entries(config.tipos)) {
+            const opcion = new Option(disponible ? nombre : `${nombre} (pronto)`, valor);
+            opcion.disabled = !disponible;
+            tipo.append(opcion);
+        }
+        const pregunta = document.createElement('input');
+        pregunta.className = 'campo-chico w-64 max-w-full';
+        pregunta.maxLength = 500;
+        pregunta.placeholder = 'Tu pregunta (opcional)';
+
+        return [
+            texto('Pedí una lectura:'),
+            tipo,
+            pregunta,
+            boton('Pedir', () => acciones.alPedir(tipo.value, pregunta.value.trim())),
+        ];
+    }
 
     const hud = {
         /** Quiénes están conectadas ahora (presencia): here() trae la lista, joining/leaving los cambios. */
@@ -62,26 +99,50 @@ export function crearHud(config, acciones) {
             temporizadorAviso = setTimeout(() => ($('#aviso').hidden = true), 4000);
         },
 
-        /** Estado de la lectura activa + barra de acción: cada una ve solo lo que puede hacer ahora. */
-        mostrar({ lectura, elegidas, reveladas, ocupada }) {
+        /** ¿Está conectada ahora? (presencia) */
+        estaConectada(rol) {
+            return [...miembros.values()].some((m) => m.rol === rol);
+        },
+
+        /** Estado + barra de acción: cada una ve solo lo que puede hacer en este momento. */
+        mostrar({ estadoConsulta, urlResumen, lectura, elegidas, reveladas, pedidoPendiente, ocupada }) {
             const barra = $('#acciones');
             barra.replaceChildren();
             const agregar = (...elementos) => barra.append(...elementos);
 
             $('#pregunta').hidden = !lectura?.pregunta;
             $('#pregunta').textContent = lectura?.pregunta ? `«${lectura.pregunta}»` : '';
+            $('#tipo-lectura').textContent = lectura ? config.tipos[lectura.tipo].nombre : '';
 
-            if (!lectura) {
-                $('#tipo-lectura').textContent = '';
-                $('#estado').textContent = 'Sin lectura';
-                agregar(texto('Todavía no hay una lectura en curso.'));
+            // --- La consulta terminó ---
+            if (estadoConsulta === 'finalizada') {
+                $('#estado').textContent = 'Consulta finalizada';
+                agregar(texto('La consulta terminó.'), enlace('Ver el resumen', urlResumen));
+                agregar(soyTarotista ? enlace('Volver al panel', config.rutas.atencion, true) : enlace('Pedir otra consulta', config.rutas.espera, true));
 
                 return;
             }
 
+            // --- Sin lectura: se conversa y se pide un servicio ---
+            if (!lectura) {
+                $('#estado').textContent = 'Conversando';
+                if (soyTarotista) {
+                    agregar(texto(pedidoPendiente ? 'Tenés un pedido para responder en el chat.' : `Esperando que ${config.consultante} pida una lectura.`));
+                    if (puedeMarcarAusente()) agregar(boton('No llegó', acciones.alAusente));
+                    agregar(boton('Finalizar consulta', acciones.alFinalizar, true));
+                } else if (pedidoPendiente) {
+                    agregar(texto(`Esperando que ${config.tarotista} responda tu pedido…`));
+                } else {
+                    agregar(...formularioPedido());
+                }
+                desactivar(barra, ocupada);
+
+                return;
+            }
+
+            // --- Con una lectura en curso ---
             const { estado } = lectura;
             const cantidad = config.tipos[lectura.tipo].posiciones.length;
-            $('#tipo-lectura').textContent = config.tipos[lectura.tipo].nombre;
             $('#estado').textContent = config.etiquetas[estado] + (estado === 'eligiendo' ? ` ${elegidas}/${cantidad}` : '');
 
             if (soyTarotista) {
@@ -90,15 +151,16 @@ export function crearHud(config, acciones) {
                 if (estado === 'revelando') {
                     agregar(texto('Tocá una carta de la tirada para revelarla, o:'), boton('Revelar la siguiente', acciones.alRevelarSiguiente));
                 }
-                if (estado === 'abierta') agregar(texto('Están todas reveladas.'));
+                if (estado === 'abierta') agregar(boton('Cerrar lectura', acciones.alCerrarLectura));
+                agregar(boton('Finalizar consulta', acciones.alFinalizar, true));
             } else {
                 if (estado === 'lista') agregar(texto(`${config.tarotista} va a mezclar el mazo.`));
                 if (estado === 'eligiendo') agregar(texto(`Elegí ${cantidad - elegidas} carta${cantidad - elegidas === 1 ? '' : 's'} del abanico.`));
                 if (estado === 'revelando') agregar(texto(`${config.tarotista} está revelando tus cartas…`));
-                if (estado === 'abierta') agregar(texto(`Ya se revelaron ${reveladas} cartas.`));
+                if (estado === 'abierta') agregar(texto(`Ya se revelaron ${reveladas} cartas. Charlalas en el chat.`));
             }
 
-            barra.querySelectorAll('button').forEach((b) => (b.disabled = ocupada));
+            desactivar(barra, ocupada);
         },
 
         /** Agrega una carta revelada al panel lateral (payload de CartaRevelada). */

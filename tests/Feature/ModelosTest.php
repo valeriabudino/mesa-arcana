@@ -74,7 +74,7 @@ it('pasarA valida contra la máquina de estados', function () {
     $lectura->pasarA(EstadoLectura::Eligiendo);
     expect($lectura->estado)->toBe(EstadoLectura::Eligiendo);
 
-    $lectura->pasarA(EstadoLectura::Cerrada);
+    $lectura->pasarA(EstadoLectura::Abierta); // sin pasar por Revelando: no se puede
 })->throws(AccionFueraDeOrden::class);
 
 it('la base rechaza dos cartas en la misma posición', function () {

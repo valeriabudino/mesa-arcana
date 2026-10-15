@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Carta;
 use App\Models\Consulta;
 use App\Models\Lectura;
+use App\Services\ConsultaService;
 use App\Services\LecturaCartasService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,7 +18,10 @@ use Illuminate\Http\Response;
  */
 class LecturaController extends Controller
 {
-    public function __construct(private LecturaCartasService $cartas) {}
+    public function __construct(
+        private LecturaCartasService $cartas,
+        private ConsultaService $consultas,
+    ) {}
 
     public function mezclar(Consulta $consulta, Lectura $lectura): Response
     {
@@ -44,6 +48,13 @@ class LecturaController extends Controller
         ]);
 
         $this->cartas->revelar($lectura, $datos['posicion']);
+
+        return response()->noContent();
+    }
+
+    public function cerrar(Consulta $consulta, Lectura $lectura): Response
+    {
+        $this->consultas->cerrarLectura($lectura);
 
         return response()->noContent();
     }

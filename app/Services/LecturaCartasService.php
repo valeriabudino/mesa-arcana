@@ -24,6 +24,10 @@ class LecturaCartasService
 {
     use EmiteEventos;
 
+    private const ORDINALES = ['primera', 'segunda', 'tercera', 'cuarta', 'quinta', 'sexta', 'séptima', 'octava', 'novena', 'décima'];
+
+    public function __construct(private ChatService $chat) {}
+
     /**
      * Mezcla en el servidor (Lista → Eligiendo). El orden real queda en orden_mazo ($hidden).
      */
@@ -40,7 +44,8 @@ class LecturaCartasService
         });
 
         // Semilla SOLO visual: un número aparte, sin relación con orden_mazo.
-        $this->emitir(new MazoMezclado($lectura->consulta->uuid, random_int(1, 2_147_483_647)));
+        $this->emitir(new MazoMezclado($lectura->consulta->uuid, $lectura->id, random_int(1, 2_147_483_647)));
+        $this->chat->sistema($lectura->consulta, "{$lectura->consulta->tarotista->name} mezcló el mazo.");
 
         return $lectura;
     }
@@ -76,6 +81,9 @@ class LecturaCartasService
         });
 
         $this->emitir(new CartaElegida($lectura->consulta->uuid, $elegida));
+        // Ojo: la bitácora NUNCA nombra la carta elegida (sería otra puerta de atrás).
+        $ordinal = self::ORDINALES[$elegida->posicion] ?? ($elegida->posicion + 1).'ª';
+        $this->chat->sistema($lectura->consulta, "{$lectura->consulta->consultante->name} eligió su {$ordinal} carta.");
 
         return $elegida;
     }
@@ -108,6 +116,8 @@ class LecturaCartasService
         });
 
         $this->emitir(new CartaRevelada($lectura->consulta->uuid, $carta->load('carta')->setRelation('lectura', $lectura)));
+        // Sin el nombre: que la sorpresa la dé la carta girando, no el chat.
+        $this->chat->sistema($lectura->consulta, "{$lectura->consulta->tarotista->name} reveló la carta de «{$lectura->tipo->nombrePosicion($posicion)}».");
 
         return $carta;
     }
@@ -122,11 +132,7 @@ class LecturaCartasService
     {
         $lectura->load('cartas');
 
-        return [
-            'id' => $lectura->id,
-            'tipo' => $lectura->tipo->value,
-            'estado' => $lectura->estado->value,
-            'pregunta' => $lectura->pregunta,
+        return $lectura->datosPublicos() + [
             'cartas' => $lectura->cartas->map(function (LecturaCarta $elegida) use ($lectura) {
                 if (! $elegida->estaRevelada()) {
                     return ['revelada' => false] + $elegida->datosElegida();

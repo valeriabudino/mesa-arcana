@@ -2,6 +2,7 @@
 
 use App\Enums\TipoLectura;
 use App\Http\Controllers\AtencionController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ConsultaController;
 use App\Http\Controllers\EsperaController;
 use App\Http\Controllers\LecturaController;
@@ -61,12 +62,25 @@ Route::middleware('auth')->group(function () {
 Route::middleware('auth')->prefix('c/{consulta}')->name('consultas.')->scopeBindings()->group(function () {
     Route::get('/', [ConsultaController::class, 'show'])->name('show')->can('ver', 'consulta');
     Route::get('estado', [ConsultaController::class, 'estado'])->name('estado')->can('ver', 'consulta');
+    Route::get('resumen', [ConsultaController::class, 'resumen'])->name('resumen')->can('ver', 'consulta');
+    Route::post('finalizar', [ConsultaController::class, 'finalizar'])->name('finalizar')->can('conducir', 'consulta');
+    Route::post('ausente', [ConsultaController::class, 'ausente'])->name('ausente')->can('conducir', 'consulta');
+
+    // Chat
+    Route::get('mensajes', [ChatController::class, 'index'])->name('mensajes')->can('ver', 'consulta');
+    Route::post('mensajes', [ChatController::class, 'store'])->name('mensajes.store')->can('escribir', 'consulta')
+        ->middleware('throttle:20,1'); // anti-spam: 20 por minuto
+    Route::post('pedidos', [ChatController::class, 'pedir'])->name('pedidos')->can('pedir', 'consulta');
+    // scopeBindings: {mensaje} tiene que ser de ESTA consulta.
+    Route::post('pedidos/{mensaje}/aceptar', [ChatController::class, 'aceptar'])->name('pedidos.aceptar')->can('conducir', 'consulta');
+    Route::post('pedidos/{mensaje}/rechazar', [ChatController::class, 'rechazar'])->name('pedidos.rechazar')->can('conducir', 'consulta');
 
     // scopeBindings: {lectura} tiene que ser de ESTA consulta (si no, 404).
     Route::prefix('lecturas/{lectura}')->name('lecturas.')->group(function () {
         Route::post('mezclar', [LecturaController::class, 'mezclar'])->name('mezclar')->can('mezclar', 'lectura');
         Route::post('elegir', [LecturaController::class, 'elegir'])->name('elegir')->can('elegir', 'lectura');
         Route::post('revelar', [LecturaController::class, 'revelar'])->name('revelar')->can('revelar', 'lectura');
+        Route::post('cerrar', [LecturaController::class, 'cerrar'])->name('cerrar')->can('cerrar', 'lectura');
     });
 });
 

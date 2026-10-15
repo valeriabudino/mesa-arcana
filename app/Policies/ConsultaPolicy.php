@@ -16,4 +16,22 @@ class ConsultaPolicy
     {
         return $consulta->participa($user);
     }
+
+    /** Escribir en el chat: las dos. */
+    public function escribir(User $user, Consulta $consulta): bool
+    {
+        return $consulta->participa($user);
+    }
+
+    /** Pedir un servicio desde el chat: la consultante. */
+    public function pedir(User $user, Consulta $consulta): bool
+    {
+        return $consulta->esConsultante($user);
+    }
+
+    /** Aceptar/rechazar pedidos, finalizar y marcar ausente: la tarotista de la consulta. */
+    public function conducir(User $user, Consulta $consulta): bool
+    {
+        return $consulta->esTarotista($user);
+    }
 }

@@ -62,6 +62,21 @@ class Lectura extends Model
         return $this->belongsTo(Consulta::class);
     }
 
+    /**
+     * Lo público de una lectura (sin cartas): lo usan LecturaIniciada y GET /estado.
+     *
+     * @return array{id: int, tipo: string, estado: string, pregunta: string|null}
+     */
+    public function datosPublicos(): array
+    {
+        return [
+            'id' => $this->id,
+            'tipo' => $this->tipo->value,
+            'estado' => $this->estado->value,
+            'pregunta' => $this->pregunta,
+        ];
+    }
+
     /** @return HasMany<LecturaCarta, $this> */
     public function cartas(): HasMany
     {

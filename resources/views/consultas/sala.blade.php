@@ -38,11 +38,28 @@
         Reconectando…
     </div>
 
-    {{-- Panel lateral: lo que se va revelando --}}
-    <aside class="absolute bottom-24 right-3 top-16 hidden w-80 flex-col gap-3 overflow-auto rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/85 p-4 text-sm backdrop-blur md:flex">
-        <p id="pregunta" hidden class="italic text-[#F3EBDD]/80"></p>
-        <ol id="reveladas" class="space-y-4"></ol>
-        <p id="sin-reveladas" class="text-[#F3EBDD]/50">Todavía no hay cartas reveladas.</p>
+    {{-- Panel lateral con dos pestañas: la lectura y el chat. En el celu, abajo. --}}
+    <aside class="absolute inset-x-3 bottom-24 flex h-[38dvh] flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur md:inset-x-auto md:right-3 md:top-16 md:h-auto md:w-80">
+        <nav class="flex border-b border-[#C9A54C]/30" role="tablist">
+            <button data-pestana="lectura" role="tab" class="flex-1 px-3 py-2">Lectura</button>
+            <button data-pestana="chat" role="tab" class="flex-1 px-3 py-2">Chat <span id="no-leidos" hidden class="ml-1 rounded-full bg-[#C97B8E] px-1.5 text-xs text-[#0E0B1A]"></span></button>
+        </nav>
+
+        <section data-panel="lectura" class="flex-1 space-y-3 overflow-auto p-4">
+            <p id="pregunta" hidden class="italic text-[#F3EBDD]/80"></p>
+            <ol id="reveladas" class="space-y-4"></ol>
+            <p id="sin-reveladas" class="text-[#F3EBDD]/50">Todavía no hay cartas reveladas.</p>
+        </section>
+
+        <section data-panel="chat" hidden class="flex min-h-0 flex-1 flex-col">
+            <ol id="chat-lista" class="flex-1 space-y-2 overflow-auto p-3" aria-live="polite"></ol>
+            <p id="escribiendo" class="h-5 px-3 text-xs italic text-[#F3EBDD]/50"></p>
+            <form id="chat-form" class="flex gap-2 border-t border-[#C9A54C]/30 p-2">
+                <input id="chat-texto" maxlength="1000" autocomplete="off" placeholder="Escribí un mensaje…"
+                       class="min-w-0 flex-1 rounded-md border border-[#C9A54C]/40 bg-[#2A1E4A] px-2 py-1.5">
+                <button class="boton !px-3 !py-1.5">Enviar</button>
+            </form>
+        </section>
     </aside>
 
     {{-- Barra de acción: cambia según rol × estado --}}
@@ -54,6 +71,8 @@
         .boton { border-radius: .5rem; border: 1px solid rgb(201 165 76 / .6); background: #2A1E4A; padding: .55rem 1.1rem; font-weight: 600; }
         .boton:hover:not(:disabled) { background: #3A2A63; }
         .boton:disabled { opacity: .4; cursor: wait; }
+        [role=tab][aria-selected=true] { color: #C9A54C; box-shadow: inset 0 -2px #C9A54C; }
+        .campo-chico { border-radius: .375rem; border: 1px solid rgb(201 165 76 / .4); background: #2A1E4A; padding: .45rem .6rem; }
     </style>
 
     <script type="application/json" id="datos-mesa">@json($config)</script>

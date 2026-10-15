@@ -14,6 +14,11 @@ use App\Enums\Concerns\MaquinaDeEstados;
  *
  * Carta astral:
  *   EsperandoDatos ─(consultante envía datos)─▶ Calculada ─(tarotista cierra)─▶ Cerrada
+ *
+ * Interrupción: cualquier estado no final ─(la tarotista finaliza la consulta)─▶ Cerrada.
+ * Así nunca queda trabada una consulta si la consultante se va a mitad de una tirada.
+ * El botón "Cerrar lectura" igual exige Abierta o Calculada (lo controla ConsultaService);
+ * y en el resumen solo aparecen las cartas reveladas.
  */
 enum EstadoLectura: string
 {
@@ -30,11 +35,11 @@ enum EstadoLectura: string
     public function siguientes(): array
     {
         return match ($this) {
-            self::Lista => [self::Eligiendo],
-            self::Eligiendo => [self::Revelando],
-            self::Revelando => [self::Abierta],
+            self::Lista => [self::Eligiendo, self::Cerrada],
+            self::Eligiendo => [self::Revelando, self::Cerrada],
+            self::Revelando => [self::Abierta, self::Cerrada],
             self::Abierta => [self::Eligiendo, self::Cerrada],
-            self::EsperandoDatos => [self::Calculada],
+            self::EsperandoDatos => [self::Calculada, self::Cerrada],
             self::Calculada => [self::Cerrada],
             self::Cerrada => [],
         };

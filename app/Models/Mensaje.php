@@ -55,4 +55,24 @@ class Mensaje extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    /**
+     * Lo ÚNICO que se publica de un mensaje: lo usan el evento MensajeEnviado y
+     * GET /c/{uuid}/mensajes. El contenido va tal cual se escribió (texto plano):
+     * quien lo muestra lo pone con textContent / {{ }}, nunca como HTML.
+     *
+     * @return array<string, mixed>
+     */
+    public function datosPublicos(): array
+    {
+        return [
+            'id' => $this->id, // incremental: el navegador pide "los posteriores a este" al reconectar
+            'tipo' => $this->tipo->value,
+            'autor' => $this->autora ? ['rol' => $this->autora->rol->value, 'nombre' => $this->autora->name] : null,
+            'contenido' => $this->contenido,
+            'servicio' => $this->servicio?->value,
+            'estado_pedido' => $this->estado_pedido?->value,
+            'creado' => $this->created_at->toIso8601String(),
+        ];
+    }
 }

@@ -30,6 +30,11 @@ it('Lectura: solo las transiciones del diagrama', function (L $actual, L $nuevo)
         [L::Abierta, L::Cerrada],
         [L::EsperandoDatos, L::Calculada],
         [L::Calculada, L::Cerrada],
+        // interrupción al finalizar la consulta: de cualquier estado no final a Cerrada
+        [L::Lista, L::Cerrada],
+        [L::Eligiendo, L::Cerrada],
+        [L::Revelando, L::Cerrada],
+        [L::EsperandoDatos, L::Cerrada],
     ];
 
     expect($actual->puedePasarA($nuevo))->toBe(in_array([$actual, $nuevo], $validas, true));

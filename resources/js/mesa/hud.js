@@ -30,8 +30,6 @@ export function crearHud(config, acciones) {
         for (const rol of ['tarotista', 'consultante']) {
             $(`[data-presencia=${rol}] i`).className = `size-2.5 rounded-full ${roles.has(rol) ? 'bg-emerald-400' : 'bg-zinc-600'}`;
         }
-        const consultante = [...miembros.values()].find((m) => m.rol === 'consultante');
-        if (consultante) hud.nombreConsultante(consultante.name);
     };
 
     const hud = {
@@ -52,10 +50,6 @@ export function crearHud(config, acciones) {
             pintarPresencia();
         },
 
-        nombreConsultante(nombre) {
-            if (nombre) $('[data-presencia=consultante] [data-nombre]').textContent = nombre;
-        },
-
         conexion(estado) {
             $('#conexion').hidden = estado === 'connected';
             $('#conexion').textContent = estado === 'connecting' || estado === 'initialized' ? 'Conectando…' : 'Reconectando…';
@@ -68,58 +62,40 @@ export function crearHud(config, acciones) {
             temporizadorAviso = setTimeout(() => ($('#aviso').hidden = true), 4000);
         },
 
-        /** Estado + barra de acción: cada una ve solo lo que puede hacer en este momento. */
-        mostrar({ estado, elegidas, reveladas, consultante, urlResumen, ocupada }) {
-            const cantidad = config.posiciones.length;
-            $('#estado').textContent = config.etiquetas[estado] + (estado === 'eligiendo' ? ` ${elegidas}/${cantidad}` : '');
-            hud.nombreConsultante(consultante);
-
+        /** Estado de la lectura activa + barra de acción: cada una ve solo lo que puede hacer ahora. */
+        mostrar({ lectura, elegidas, reveladas, ocupada }) {
             const barra = $('#acciones');
             barra.replaceChildren();
             const agregar = (...elementos) => barra.append(...elementos);
 
-            if (estado === 'finalizada') {
-                const link = document.createElement('a');
-                link.className = 'boton';
-                link.href = urlResumen;
-                link.textContent = 'Ver el resumen';
-                agregar(texto('La lectura terminó.'), link);
+            $('#pregunta').hidden = !lectura?.pregunta;
+            $('#pregunta').textContent = lectura?.pregunta ? `«${lectura.pregunta}»` : '';
+
+            if (!lectura) {
+                $('#tipo-lectura').textContent = '';
+                $('#estado').textContent = 'Sin lectura';
+                agregar(texto('Todavía no hay una lectura en curso.'));
 
                 return;
             }
 
+            const { estado } = lectura;
+            const cantidad = config.tipos[lectura.tipo].posiciones.length;
+            $('#tipo-lectura').textContent = config.tipos[lectura.tipo].nombre;
+            $('#estado').textContent = config.etiquetas[estado] + (estado === 'eligiendo' ? ` ${elegidas}/${cantidad}` : '');
+
             if (soyTarotista) {
-                if (estado === 'esperando') {
-                    const campo = document.createElement('input');
-                    campo.readOnly = true;
-                    campo.value = config.link;
-                    campo.className = 'w-80 max-w-full rounded-md border border-[#C9A54C]/40 bg-[#2A1E4A] px-2 py-1.5';
-                    campo.addEventListener('focus', () => campo.select());
-                    agregar(
-                        texto('Pasale este link a la consultante:'),
-                        campo,
-                        boton('Copiar', async () => {
-                            campo.select();
-                            await navigator.clipboard?.writeText(config.link).catch(() => {});
-                            hud.aviso('Link copiado');
-                        }),
-                    );
-                }
                 if (estado === 'lista') agregar(boton('Mezclar', acciones.alMezclar));
-                if (estado === 'eligiendo') agregar(texto(`${consultante ?? 'La consultante'} está eligiendo sus cartas…`));
+                if (estado === 'eligiendo') agregar(texto(`${config.consultante} está eligiendo sus cartas…`));
                 if (estado === 'revelando') {
-                    agregar(
-                        reveladas < cantidad
-                            ? texto('Tocá una carta de la tirada para revelarla, o:')
-                            : texto('Ya están todas reveladas.'),
-                    );
-                    if (reveladas < cantidad) agregar(boton('Revelar la siguiente', acciones.alRevelarSiguiente));
-                    else agregar(boton('Finalizar la lectura', acciones.alFinalizar));
+                    agregar(texto('Tocá una carta de la tirada para revelarla, o:'), boton('Revelar la siguiente', acciones.alRevelarSiguiente));
                 }
+                if (estado === 'abierta') agregar(texto('Están todas reveladas.'));
             } else {
                 if (estado === 'lista') agregar(texto(`${config.tarotista} va a mezclar el mazo.`));
                 if (estado === 'eligiendo') agregar(texto(`Elegí ${cantidad - elegidas} carta${cantidad - elegidas === 1 ? '' : 's'} del abanico.`));
                 if (estado === 'revelando') agregar(texto(`${config.tarotista} está revelando tus cartas…`));
+                if (estado === 'abierta') agregar(texto(`Ya se revelaron ${reveladas} cartas.`));
             }
 
             barra.querySelectorAll('button').forEach((b) => (b.disabled = ocupada));

@@ -5,12 +5,12 @@ import '../echo.js';
 
 // Mismos nombres que broadcastAs() en PHP. El punto inicial le dice a Echo
 // que no les agregue el namespace App\Events (como en la guía).
-export const EVENTOS = ['ConsultanteIngreso', 'MazoMezclado', 'CartaElegida', 'CartaRevelada', 'SesionFinalizada'];
+export const EVENTOS = ['MazoMezclado', 'CartaElegida', 'CartaRevelada'];
 
 export function conectar(uuid, manejadores) {
-    // join() = canal de PRESENCIA: Laravel autoriza en routes/channels.php y
-    // devuelve quiénes están (id, name, rol).
-    const canal = window.Echo.join(`sesion.${uuid}`)
+    // join() = canal de PRESENCIA de la consulta: Laravel autoriza en routes/channels.php
+    // y devuelve quiénes están (id, name, rol).
+    const canal = window.Echo.join(`consulta.${uuid}`)
         // here() se dispara al suscribirse... y otra vez después de cada reconexión.
         .here((miembros) => manejadores.alSuscribirse(miembros))
         .joining((miembro) => manejadores.alEntrar(miembro))

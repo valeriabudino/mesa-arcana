@@ -1,4 +1,4 @@
-// El "controlador" de la mesa: conecta la red (tiempoReal, api) con la escena
+// El "controlador" de la sala privada: conecta la red (tiempoReal, api) con la escena
 // (animaciones) y el HUD. Es el único módulo que conoce a todos los demás.
 //
 // Regla de oro: un clic NO mueve nada. Hace un POST; la animación arranca recién
@@ -15,7 +15,6 @@ import { conectar } from './tiempoReal.js';
 
 const config = JSON.parse(document.getElementById('datos-mesa').textContent);
 const soyTarotista = config.yo.rol === 'tarotista';
-const cantidad = config.posiciones.length;
 
 if (!hayWebGL()) {
     document.getElementById('sin-webgl').hidden = false;
@@ -24,26 +23,26 @@ if (!hayWebGL()) {
 
 const escena = crearEscena(document.getElementById('lienzo'));
 const mazo = crearMazo(escena);
-const animaciones = crearAnimaciones({ escena, mazo, tipoTirada: config.tipo_tirada });
+const animaciones = crearAnimaciones({ escena, mazo, tipoTirada: 'tres_cartas' }); // el tipo real llega con la lectura
 const hud = crearHud(config, {
     alMezclar: () => accion('mezclar'),
     alRevelarSiguiente: () => {
         const siguiente = [...mesa.cartas.values()].filter((c) => !c.revelada).sort((a, b) => a.posicion - b.posicion)[0];
         if (siguiente) accion('revelar', { posicion: siguiente.posicion });
     },
-    alFinalizar: () => accion('finalizar'),
 });
 
 // Copia local de lo que dijo el servidor. Solo cambia con GET /estado o con un evento.
-const mesa = { estado: null, consultante: null, urlResumen: null, cartas: new Map(), ocupada: false };
+// lectura = la lectura activa de la consulta ({ id, tipo, estado, pregunta }) o null.
+const mesa = { cargada: false, lectura: null, cartas: new Map(), ocupada: false };
+
+const cantidad = () => config.tipos[mesa.lectura.tipo].posiciones.length;
 
 const refrescar = () =>
     hud.mostrar({
-        estado: mesa.estado,
+        lectura: mesa.lectura,
         elegidas: mesa.cartas.size,
         reveladas: [...mesa.cartas.values()].filter((c) => c.revelada).length,
-        consultante: mesa.consultante,
-        urlResumen: mesa.urlResumen,
         ocupada: mesa.ocupada,
     });
 
@@ -67,39 +66,35 @@ async function cargarEstado() {
         return;
     }
 
-    mesa.estado = foto.estado;
-    mesa.consultante = foto.consultante;
-    mesa.urlResumen = foto.url_resumen;
-    mesa.cartas = new Map(foto.cartas.map((c) => [c.posicion, c]));
+    const { cartas = [], ...lectura } = foto.lectura ?? {};
+    mesa.cargada = true;
+    mesa.lectura = foto.lectura ? lectura : null;
+    mesa.cartas = new Map(cartas.map((c) => [c.posicion, c]));
 
     hud.limpiarReveladas();
-    foto.cartas.filter((c) => c.revelada).forEach(hud.agregarRevelada);
+    cartas.filter((c) => c.revelada).forEach(hud.agregarRevelada);
     refrescar();
-    await animaciones.dibujar(foto);
+
+    if (foto.lectura) await animaciones.dibujar(foto.lectura);
+    else animaciones.reiniciar(); // sin lectura: el mazo quieto sobre la mesa
 }
 
 // Cada evento primero se fija si ya está reflejado (pudo venir incluido en la foto
 // de /estado): así un evento "repetido" no hace nada.
 const alEvento = {
-    ConsultanteIngreso({ nombre }) {
-        mesa.consultante = nombre;
-        if (mesa.estado === 'esperando') mesa.estado = 'lista';
-        refrescar();
-    },
-
     async MazoMezclado(payload) {
-        if (mesa.estado !== 'lista') return;
-        mesa.estado = 'eligiendo';
+        if (mesa.lectura?.estado !== 'lista') return;
+        mesa.lectura.estado = 'eligiendo';
         refrescar();
         await animaciones.mezclar(payload);
         await animaciones.abanico();
     },
 
     async CartaElegida(payload) {
-        if (mesa.cartas.has(payload.posicion)) return;
+        if (!mesa.lectura || mesa.cartas.has(payload.posicion)) return;
         mesa.cartas.set(payload.posicion, { ...payload, revelada: false });
-        const completa = mesa.cartas.size === cantidad;
-        if (completa) mesa.estado = 'revelando'; // el servidor pasa a Revelando en la misma transacción
+        const completa = mesa.cartas.size === cantidad();
+        if (completa) mesa.lectura.estado = 'revelando'; // el servidor pasa a Revelando en la misma transacción
         refrescar();
         await animaciones.elegir(payload);
         if (completa) await animaciones.recogerAbanico();
@@ -109,28 +104,21 @@ const alEvento = {
         const elegida = mesa.cartas.get(payload.posicion);
         if (!elegida || elegida.revelada) return;
         mesa.cartas.set(payload.posicion, { ...elegida, ...payload, revelada: true }); // conserva indice_abanico
+        if ([...mesa.cartas.values()].every((c) => c.revelada)) mesa.lectura.estado = 'abierta'; // ídem: lo hace el servidor solo
         refrescar();
         await animaciones.revelar(payload);
         hud.agregarRevelada(payload);
-    },
-
-    async SesionFinalizada({ url_resumen }) {
-        if (mesa.estado === 'finalizada') return;
-        mesa.estado = 'finalizada';
-        mesa.urlResumen = url_resumen;
-        refrescar();
-        await animaciones.finalizar();
     },
 };
 
 // --- Acciones: POST y nada más ---
 
 async function accion(nombre, datos = {}) {
-    if (mesa.ocupada) return; // evita el doble clic; igual el servidor tiene el lock
+    if (mesa.ocupada || !mesa.lectura) return; // evita el doble clic; igual el servidor tiene el lock
     mesa.ocupada = true;
     refrescar();
     try {
-        await enviar(config.rutas[nombre], datos);
+        await enviar(`${config.rutas.lecturas}/${mesa.lectura.id}/${nombre}`, datos);
     } catch (error) {
         hud.aviso(error.message);
     } finally {
@@ -186,8 +174,9 @@ crearInteraccion({
     camara: escena.camara,
     objetivos() {
         if (mesa.ocupada) return [];
-        if (!soyTarotista && mesa.estado === 'eligiendo' && mesa.cartas.size < cantidad) return mazo.seleccionables();
-        if (soyTarotista && mesa.estado === 'revelando') return mazo.sinRevelar();
+        const estado = mesa.lectura?.estado;
+        if (!soyTarotista && estado === 'eligiendo' && mesa.cartas.size < cantidad()) return mazo.seleccionables();
+        if (soyTarotista && estado === 'revelando') return mazo.sinRevelar();
 
         return [];
     },

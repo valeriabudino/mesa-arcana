@@ -2,12 +2,10 @@
 
 use App\Events\CartaElegida;
 use App\Events\CartaRevelada;
-use App\Events\ConsultanteIngreso;
 use App\Events\MazoMezclado;
-use App\Events\SesionFinalizada;
-use App\Models\Sesion;
-use App\Models\SesionCarta;
-use App\Models\User;
+use App\Models\Consulta;
+use App\Models\Lectura;
+use App\Models\LecturaCarta;
 use Database\Seeders\CartaSeeder;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Support\Facades\Event;
@@ -19,13 +17,13 @@ use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
     $this->seed(CartaSeeder::class);
-    Event::fake([ConsultanteIngreso::class, MazoMezclado::class, CartaElegida::class, CartaRevelada::class, SesionFinalizada::class]);
+    Event::fake([MazoMezclado::class, CartaElegida::class, CartaRevelada::class]);
 
-    $this->consultante = User::factory()->consultante()->create();
-    $this->sesion = Sesion::factory()->conConsultante($this->consultante)->create();
-    $this->actingAs($this->sesion->tarotista)->postJson(route('sesiones.mezclar', $this->sesion));
-    $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $this->sesion), ['indice_abanico' => 5]);
-    $this->elegida = $this->sesion->cartas()->with('carta')->sole();
+    $this->consulta = Consulta::factory()->create();
+    $this->lectura = Lectura::factory()->for($this->consulta)->create();
+    $this->actingAs($this->consulta->tarotista)->postJson(rutaLectura('mezclar', $this->lectura));
+    $this->actingAs($this->consulta->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 5]);
+    $this->elegida = $this->lectura->cartas()->with('carta')->sole();
 });
 
 it('CartaElegida NO filtra la carta: solo posicion e indice_abanico', function () {
@@ -42,8 +40,8 @@ it('CartaElegida NO filtra la carta: solo posicion e indice_abanico', function (
     });
 });
 
-it('la mesa tampoco muestra la carta elegida antes de revelarla', function () {
-    $this->actingAs($this->consultante)->get(route('sesiones.show', $this->sesion))
+it('la sala tampoco muestra la carta elegida antes de revelarla', function () {
+    $this->actingAs($this->consulta->consultante)->get(route('consultas.show', $this->consulta))
         ->assertOk()
         ->assertDontSee($this->elegida->carta->nombre)
         ->assertDontSee('orden_mazo');
@@ -61,8 +59,8 @@ it('MazoMezclado no manda el orden real, solo una semilla visual', function () {
 });
 
 it('CartaRevelada sí lleva la carta, con el significado según cómo salió', function () {
-    $this->sesion->forceFill(['estado' => 'revelando'])->save();
-    $this->actingAs($this->sesion->tarotista)->postJson(route('sesiones.revelar', $this->sesion), ['posicion' => 0])->assertNoContent();
+    $this->lectura->forceFill(['estado' => 'revelando'])->save();
+    $this->actingAs($this->consulta->tarotista)->postJson(rutaLectura('revelar', $this->lectura), ['posicion' => 0])->assertNoContent();
 
     $carta = $this->elegida->carta;
     $esperado = $this->elegida->invertida ? $carta->significado_invertido : $carta->significado_derecho;
@@ -80,16 +78,15 @@ it('CartaRevelada sí lleva la carta, con el significado según cómo salió', f
     });
 });
 
-it('todos los eventos van por el canal de presencia de la sesión con su broadcastAs', function (string $clase, array $args) {
-    $evento = new $clase($this->sesion->uuid, ...$args);
+it('todos los eventos van por el canal de presencia de la consulta con su broadcastAs', function (string $clase, array $args) {
+    $evento = new $clase($this->consulta->uuid, ...$args);
     $canal = $evento->broadcastOn()[0];
 
     expect($canal)->toBeInstanceOf(PresenceChannel::class)
-        ->and($canal->name)->toBe('presence-sesion.'.$this->sesion->uuid)
+        ->and($canal->name)->toBe('presence-consulta.'.$this->consulta->uuid)
         ->and($evento->broadcastAs())->toBe(class_basename($clase));
 })->with([
-    'ConsultanteIngreso' => [ConsultanteIngreso::class, ['María']],
     'MazoMezclado' => [MazoMezclado::class, [123]],
-    'CartaElegida' => [CartaElegida::class, fn () => [new SesionCarta(['posicion' => 0, 'indice_abanico' => 5])]],
-    'SesionFinalizada' => [SesionFinalizada::class, ['http://localhost/s/x/resumen']],
+    'CartaElegida' => [CartaElegida::class, fn () => [new LecturaCarta(['posicion' => 0, 'indice_abanico' => 5])]],
+    'CartaRevelada' => [CartaRevelada::class, fn () => [new LecturaCarta(['posicion' => 0, 'indice_abanico' => 5])]],
 ]);

@@ -18,7 +18,7 @@ class MazoMezclado implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PresenceChannel('sesion.'.$this->uuid)];
+        return [new PresenceChannel('consulta.'.$this->uuid)];
     }
 
     public function broadcastAs(): string

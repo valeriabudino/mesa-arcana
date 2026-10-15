@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Arcano;
+use App\Enums\SiNo;
 use App\Models\Carta;
 use Database\Seeders\CartaSeeder;
 
@@ -23,4 +24,13 @@ it('es idempotente', function () {
     $this->seed(CartaSeeder::class);
 
     expect(Carta::count())->toBe(78);
+});
+
+it('cada carta sabe qué responde en un sí o no', function () {
+    $this->seed(CartaSeeder::class);
+
+    expect(Carta::whereNull('si_no')->count())->toBe(0)
+        ->and(Carta::firstWhere('nombre', 'El Sol')->si_no)->toBe(SiNo::Si)
+        ->and(Carta::firstWhere('nombre', 'La Torre')->si_no)->toBe(SiNo::No)
+        ->and(Carta::firstWhere('nombre', 'La Sacerdotisa')->si_no)->toBe(SiNo::Quizas);
 });

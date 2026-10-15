@@ -18,6 +18,7 @@ return new class extends Migration
             $table->text('significado_derecho');
             $table->text('significado_invertido');
             $table->json('palabras_clave');
+            $table->enum('si_no', ['si', 'no', 'quizas']); // qué responde en una tirada de sí o no
             $table->timestamps();
 
             $table->unique(['palo', 'numero']);

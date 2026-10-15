@@ -169,7 +169,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             return tl.then();
         },
 
-        /** SesionFinalizada — la cámara se aleja y las cartas reveladas quedan brillando. */
+        /** Cierre (con ConsultaFinalizada, en la Fase 3): la cámara se aleja y las reveladas quedan brillando. */
         finalizar() {
             const tl = gsap.timeline();
             const lejos = vista.posicion.clone().sub(vista.objetivo).multiplyScalar(1.15).add(vista.objetivo);
@@ -196,12 +196,13 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
         },
 
         /**
-         * Dibuja de golpe la foto de GET /s/{uuid}/estado (al entrar o al reconectar).
+         * Dibuja de golpe la lectura de GET /c/{uuid}/estado (al entrar o al reconectar).
          * Las cartas sin revelar llegan solo con posicion e indice_abanico, igual que en CartaElegida.
          */
-        async dibujar({ estado, cartas }) {
+        async dibujar({ tipo, estado, cartas }) {
             animaciones.reiniciar();
-            if (estado === 'esperando' || estado === 'lista') return; // el mazo quieto en el centro
+            animaciones.usarTirada(tipo);
+            if (estado === 'lista') return; // el mazo quieto en el centro
 
             // El abanico completo y, encima, las elegidas en su lugar de la tirada.
             mazo.cartas.forEach((carta, i) => {
@@ -216,7 +217,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                 mazo.colocar(carta, lugarEnTirada(tipoTirada, elegida.posicion));
             }
 
-            if (estado === 'revelando' || estado === 'finalizada') {
+            if (estado === 'revelando' || estado === 'abierta') {
                 mazo.cartas
                     .filter((carta) => carta.enAbanico)
                     .forEach((carta, k) => {
@@ -243,8 +244,11 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                         if (elegida.invertida) carta.pivote.rotation.y += Math.PI;
                     }),
             );
+        },
 
-            if (estado === 'finalizada') await animaciones.finalizar();
+        /** Cambia el tipo de tirada (cada lectura de la consulta puede ser de otro tipo). */
+        usarTirada(tipo) {
+            tipoTirada = tipo;
         },
 
         /** Vuelve todo al principio sin animar (para el laboratorio y al redibujar desde /estado). */

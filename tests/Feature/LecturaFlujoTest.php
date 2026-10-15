@@ -1,56 +1,43 @@
 <?php
 
-use App\Enums\EstadoSesion;
-use App\Enums\TipoTirada;
+use App\Enums\EstadoConsulta;
+use App\Enums\EstadoLectura;
 use App\Events\CartaElegida;
 use App\Events\CartaRevelada;
-use App\Events\ConsultanteIngreso;
 use App\Events\MazoMezclado;
-use App\Events\SesionFinalizada;
 use App\Models\Carta;
-use App\Models\Sesion;
+use App\Models\Consulta;
+use App\Models\Lectura;
 use App\Models\User;
 use Database\Seeders\CartaSeeder;
 use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
     $this->seed(CartaSeeder::class);
-    Event::fake([ConsultanteIngreso::class, MazoMezclado::class, CartaElegida::class, CartaRevelada::class, SesionFinalizada::class]);
+    Event::fake([MazoMezclado::class, CartaElegida::class, CartaRevelada::class]);
 
-    $this->tarotista = User::factory()->tarotista()->create();
-    $this->consultante = User::factory()->consultante()->create();
+    $this->consulta = Consulta::factory()->create();
+    $this->tarotista = $this->consulta->tarotista;
+    $this->consultante = $this->consulta->consultante;
+    $this->lectura = Lectura::factory()->for($this->consulta)->create(); // tres cartas, Lista
 });
 
-/** Sesión de 3 cartas con la consultante ya adentro. */
-function sesionLista(): Sesion
+/** Mezcla y elige las tres cartas: deja la lectura en Revelando. */
+function elegirLasTres(): void
 {
-    $sesion = Sesion::factory()->create(['tarotista_id' => test()->tarotista->id, 'tipo_tirada' => TipoTirada::TresCartas]);
-    test()->actingAs(test()->consultante)->get(route('sesiones.show', $sesion))->assertOk();
-
-    return $sesion->fresh();
+    test()->actingAs(test()->tarotista)->postJson(rutaLectura('mezclar', test()->lectura));
+    foreach ([1, 2, 3] as $indice) {
+        test()->actingAs(test()->consultante)->postJson(rutaLectura('elegir', test()->lectura), ['indice_abanico' => $indice]);
+    }
 }
 
-it('recorre la lectura completa de punta a punta', function () {
-    // Crear
-    $this->actingAs($this->tarotista)
-        ->post(route('sesiones.store'), ['tipo_tirada' => 'tres_cartas', 'pregunta' => '¿Cambio de trabajo?'])
-        ->assertRedirect();
-    $sesion = Sesion::sole();
-    expect($sesion->estado)->toBe(EstadoSesion::Esperando);
-
-    // La consultante abre el link sin cuenta y entra solo con su nombre
-    auth()->logout();
-    $this->get(route('sesiones.show', $sesion))->assertOk()->assertSee('¿Cómo te llamás?');
-    $this->post(route('sesiones.ingresar', $sesion), ['nombre' => 'María'])->assertRedirect(route('sesiones.show', $sesion));
-    $this->consultante = User::firstWhere('name', 'María');
-    expect($sesion->fresh()->estado)->toBe(EstadoSesion::Lista)
-        ->and($sesion->fresh()->consultante_id)->toBe($this->consultante->id);
-    Event::assertDispatched(ConsultanteIngreso::class);
+it('recorre la tirada completa de punta a punta', function () {
+    $lectura = $this->lectura;
 
     // Mezclar: orden_mazo con las 78 cartas, sin repetir
-    $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion))->assertNoContent();
-    $orden = $sesion->fresh()->orden_mazo;
-    expect($sesion->fresh()->estado)->toBe(EstadoSesion::Eligiendo)
+    $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $lectura))->assertNoContent();
+    $orden = $lectura->fresh()->orden_mazo;
+    expect($lectura->fresh()->estado)->toBe(EstadoLectura::Eligiendo)
         ->and($orden)->toHaveCount(78)
         ->and(array_unique($orden))->toHaveCount(78)
         ->and(collect($orden)->sort()->values()->all())->toBe(Carta::orderBy('id')->pluck('id')->all());
@@ -58,111 +45,94 @@ it('recorre la lectura completa de punta a punta', function () {
 
     // Elegir 3: la última pasa sola a Revelando
     foreach ([10, 40, 70] as $i => $indice) {
-        $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => $indice])->assertNoContent();
-        expect($sesion->fresh()->cartas[$i]->carta_id)->toBe($orden[$indice]); // la carta sale del orden del servidor
+        $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $lectura), ['indice_abanico' => $indice])->assertNoContent();
+        expect($lectura->fresh()->cartas[$i]->carta_id)->toBe($orden[$indice]); // la carta sale del orden del servidor
     }
-    expect($sesion->fresh()->estado)->toBe(EstadoSesion::Revelando);
+    expect($lectura->fresh()->estado)->toBe(EstadoLectura::Revelando);
     Event::assertDispatchedTimes(CartaElegida::class, 3);
 
-    // Revelar las 3 y finalizar
-    foreach ([0, 1, 2] as $posicion) {
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.revelar', $sesion), ['posicion' => $posicion])->assertNoContent();
+    // Revelar las 3 (en cualquier orden): con la última, la lectura queda Abierta
+    foreach ([2, 0, 1] as $posicion) {
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('revelar', $lectura), ['posicion' => $posicion])->assertNoContent();
     }
+    expect($lectura->fresh()->estado)->toBe(EstadoLectura::Abierta);
     Event::assertDispatchedTimes(CartaRevelada::class, 3);
-
-    $this->actingAs($this->tarotista)->postJson(route('sesiones.finalizar', $sesion))->assertNoContent();
-    expect($sesion->fresh()->estado)->toBe(EstadoSesion::Finalizada)
-        ->and($sesion->fresh()->finalizada_at)->not->toBeNull();
-    Event::assertDispatched(SesionFinalizada::class);
-
-    // Resumen: las 3 cartas con su nombre
-    $resumen = $this->actingAs($this->consultante)->get(route('sesiones.resumen', $sesion))->assertOk();
-    $sesion->fresh()->cartas->each(fn ($sc) => $resumen->assertSee($sc->carta->nombre));
 });
 
 describe('403: no sos vos', function () {
-    it('la consultante no puede mezclar', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->consultante)->postJson(route('sesiones.mezclar', $sesion))->assertForbidden();
-    });
-
-    it('otra tarotista no puede mezclar una sesión ajena', function () {
-        $sesion = sesionLista();
-        $this->actingAs(User::factory()->tarotista()->create())->postJson(route('sesiones.mezclar', $sesion))->assertForbidden();
+    it('la consultante no puede mezclar ni revelar', function () {
+        $this->actingAs($this->consultante)->postJson(rutaLectura('mezclar', $this->lectura))->assertForbidden();
+        $this->actingAs($this->consultante)->postJson(rutaLectura('revelar', $this->lectura), ['posicion' => 0])->assertForbidden();
     });
 
     it('la tarotista no puede elegir', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion));
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => 3])->assertForbidden();
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura));
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 3])->assertForbidden();
     });
 
-    it('una segunda consultante no entra a una sesión ocupada', function () {
-        $sesion = sesionLista();
-        $this->actingAs(User::factory()->consultante()->create())->get(route('sesiones.show', $sesion))->assertForbidden();
-    });
+    it('nadie de afuera de la consulta toca la lectura', function (string $rol) {
+        $this->actingAs(User::factory()->{$rol}()->create())->postJson(rutaLectura('mezclar', $this->lectura))->assertForbidden();
+    })->with(['tarotista', 'consultante']);
 
-    it('una consultante no puede crear sesiones', function () {
-        $this->actingAs($this->consultante)->post(route('sesiones.store'), ['tipo_tirada' => 'si_no'])->assertForbidden();
-    });
+    it('sin login, las acciones redirigen al login', function (string $accion) {
+        $this->post(rutaLectura($accion, $this->lectura))->assertRedirect(route('login'));
+    })->with(['mezclar', 'elegir', 'revelar']);
+});
 
-    it('sin login, las acciones de la mesa redirigen al login', function (string $ruta) {
-        $sesion = Sesion::factory()->create();
-        $this->post(route($ruta, $sesion))->assertRedirect(route('login'));
-    })->with(['sesiones.mezclar', 'sesiones.elegir', 'sesiones.revelar', 'sesiones.finalizar']);
+it('una lectura de otra consulta no se alcanza por la URL de esta (404)', function () {
+    $ajena = Lectura::factory()->create(); // otra consulta, otras personas
+
+    // Aunque sea la tarotista de ESTA consulta, la URL mezcla consultas: scopeBindings corta antes de la policy.
+    $this->actingAs($this->tarotista)
+        ->postJson(route('consultas.lecturas.mezclar', [$this->consulta, $ajena]))
+        ->assertNotFound();
 });
 
 describe('409: no es el momento', function () {
     it('no se puede mezclar dos veces', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion))->assertNoContent();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion))->assertConflict();
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura))->assertNoContent();
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura))->assertConflict();
     });
 
     it('no se puede elegir antes de mezclar', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => 3])->assertConflict();
+        $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 3])->assertConflict();
     });
 
     it('doble clic sobre la misma carta: la segunda da 409 y no se duplica', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion));
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura));
 
-        $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => 7])->assertNoContent();
-        $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => 7])->assertConflict();
+        $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 7])->assertNoContent();
+        $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 7])->assertConflict();
 
-        expect($sesion->cartas()->count())->toBe(1);
+        expect($this->lectura->cartas()->count())->toBe(1);
     });
 
     it('no se puede elegir más cartas que las de la tirada', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion));
-        foreach ([1, 2, 3] as $indice) {
-            $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => $indice]);
-        }
+        elegirLasTres();
 
-        $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => 4])->assertConflict();
-        expect($sesion->cartas()->count())->toBe(3);
+        $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 4])->assertConflict();
+        expect($this->lectura->cartas()->count())->toBe(3);
     });
 
-    it('no se revela dos veces ni se finaliza con cartas boca abajo', function () {
-        $sesion = sesionLista();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion));
-        foreach ([1, 2, 3] as $indice) {
-            $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => $indice]);
-        }
+    it('no se revela dos veces', function () {
+        elegirLasTres();
 
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.revelar', $sesion), ['posicion' => 0])->assertNoContent();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.revelar', $sesion), ['posicion' => 0])->assertConflict();
-        $this->actingAs($this->tarotista)->postJson(route('sesiones.finalizar', $sesion))->assertConflict();
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('revelar', $this->lectura), ['posicion' => 0])->assertNoContent();
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('revelar', $this->lectura), ['posicion' => 0])->assertConflict();
+    });
+
+    it('con la consulta finalizada no se mueve nada', function () {
+        $this->consulta->forceFill(['estado' => EstadoConsulta::Finalizada])->save();
+
+        $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura))->assertConflict();
+        expect($this->lectura->fresh()->estado)->toBe(EstadoLectura::Lista);
     });
 });
 
 it('valida el índice del abanico y la posición', function () {
-    $sesion = sesionLista();
-    $this->actingAs($this->tarotista)->postJson(route('sesiones.mezclar', $sesion));
+    $this->actingAs($this->tarotista)->postJson(rutaLectura('mezclar', $this->lectura));
 
-    $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => 78])->assertUnprocessable();
-    $this->actingAs($this->consultante)->postJson(route('sesiones.elegir', $sesion), ['indice_abanico' => -1])->assertUnprocessable();
-    $this->actingAs($this->tarotista)->postJson(route('sesiones.revelar', $sesion), ['posicion' => 3])->assertUnprocessable();
+    $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => 78])->assertUnprocessable();
+    $this->actingAs($this->consultante)->postJson(rutaLectura('elegir', $this->lectura), ['indice_abanico' => -1])->assertUnprocessable();
+    $this->actingAs($this->tarotista)->postJson(rutaLectura('revelar', $this->lectura), ['posicion' => 3])->assertUnprocessable();
 });

@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use App\Models\SesionCarta;
+use App\Models\LecturaCarta;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
@@ -11,12 +11,12 @@ class CartaRevelada implements ShouldBroadcastNow
 {
     public function __construct(
         private string $uuid,
-        private SesionCarta $sesionCarta,
+        private LecturaCarta $lecturaCarta,
     ) {}
 
     public function broadcastOn(): array
     {
-        return [new PresenceChannel('sesion.'.$this->uuid)];
+        return [new PresenceChannel('consulta.'.$this->uuid)];
     }
 
     public function broadcastAs(): string
@@ -26,6 +26,6 @@ class CartaRevelada implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return $this->sesionCarta->datosRevelada();
+        return $this->lecturaCarta->datosRevelada();
     }
 }

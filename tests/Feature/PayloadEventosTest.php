@@ -51,7 +51,9 @@ it('la mesa tampoco muestra la carta elegida antes de revelarla', function () {
 it('MazoMezclado no manda el orden real, solo una semilla visual', function () {
     Event::assertDispatched(MazoMezclado::class, function (MazoMezclado $evento) {
         expect(array_keys($evento->broadcastWith()))->toBe(['semilla_animacion'])
-            ->and($evento->broadcastWith()['semilla_animacion'])->toBeInt();
+            ->and($evento->broadcastWith()['semilla_animacion'])->toBeInt()
+            // entra en 31 bits: JS la lee sin perder precisión y alimenta su generador de 32 bits
+            ->and($evento->broadcastWith()['semilla_animacion'])->toBeBetween(1, 2_147_483_647);
 
         return true;
     });

@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\TipoTirada;
 use App\Http\Controllers\LecturaController;
 use App\Http\Controllers\RemoteStyleController;
 use App\Http\Controllers\SesionController;
+use App\Models\Carta;
 use App\Models\Sesion;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +14,22 @@ Route::view('/', 'welcome')->name('home');
 Route::get('/emisor', [RemoteStyleController::class, 'emisor'])->name('emisor');
 Route::post('/emitir', [RemoteStyleController::class, 'emitir'])->name('emitir');
 Route::get('/receptor', [RemoteStyleController::class, 'receptor'])->name('receptor');
+
+// Fase 3: laboratorio de la escena 3D (animaciones con botones, sin sockets). Solo en local.
+if (app()->isLocal()) {
+    Route::get('/laboratorio-mesa', fn () => view('laboratorio-mesa', [
+        'tiradas' => collect(TipoTirada::cases())->mapWithKeys(fn (TipoTirada $t) => [
+            $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones()],
+        ]),
+        'cartas' => Carta::all()->map(fn (Carta $c) => [
+            'nombre' => $c->nombre,
+            'imagen' => $c->urlImagen(),
+            'significado_derecho' => $c->significado_derecho,
+            'significado_invertido' => $c->significado_invertido,
+            'palabras_clave' => $c->palabras_clave,
+        ]),
+    ]))->name('laboratorio-mesa');
+}
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');

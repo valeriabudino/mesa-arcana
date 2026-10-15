@@ -106,7 +106,7 @@ class LecturaService
         });
 
         // Semilla SOLO visual: un número aparte, sin relación con orden_mazo.
-        broadcast(new MazoMezclado($sesion->uuid, random_int(1, PHP_INT_MAX)));
+        broadcast(new MazoMezclado($sesion->uuid, random_int(1, 2_147_483_647)));
 
         return $sesion;
     }

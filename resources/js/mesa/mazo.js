@@ -101,6 +101,11 @@ export function crearMazo({ escena, renderer }) {
         seleccionables() {
             return cartas.filter((c) => c.enAbanico).map((c) => c.volteo);
         },
+
+        /** Las de la tirada que siguen boca abajo: lo que la tarotista puede revelar. */
+        sinRevelar() {
+            return [...mazo.porPosicion.values()].filter((c) => !c.revelada).map((c) => c.volteo);
+        },
     };
 
     mazo.reiniciar();

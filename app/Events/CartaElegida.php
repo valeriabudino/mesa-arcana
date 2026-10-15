@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\SesionCarta;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
@@ -13,8 +14,7 @@ class CartaElegida implements ShouldBroadcastNow
 {
     public function __construct(
         private string $uuid,
-        private int $posicion,
-        private int $indiceAbanico,
+        private SesionCarta $sesionCarta,
     ) {}
 
     public function broadcastOn(): array
@@ -29,9 +29,6 @@ class CartaElegida implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return [
-            'posicion' => $this->posicion,
-            'indice_abanico' => $this->indiceAbanico,
-        ];
+        return $this->sesionCarta->datosElegida();
     }
 }

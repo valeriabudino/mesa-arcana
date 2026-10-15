@@ -6,6 +6,7 @@ use App\Events\ConsultanteIngreso;
 use App\Events\MazoMezclado;
 use App\Events\SesionFinalizada;
 use App\Models\Sesion;
+use App\Models\SesionCarta;
 use App\Models\User;
 use Database\Seeders\CartaSeeder;
 use Illuminate\Broadcasting\PresenceChannel;
@@ -89,6 +90,6 @@ it('todos los eventos van por el canal de presencia de la sesión con su broadca
 })->with([
     'ConsultanteIngreso' => [ConsultanteIngreso::class, ['María']],
     'MazoMezclado' => [MazoMezclado::class, [123]],
-    'CartaElegida' => [CartaElegida::class, [0, 5]],
+    'CartaElegida' => [CartaElegida::class, fn () => [new SesionCarta(['posicion' => 0, 'indice_abanico' => 5])]],
     'SesionFinalizada' => [SesionFinalizada::class, ['http://localhost/s/x/resumen']],
 ]);

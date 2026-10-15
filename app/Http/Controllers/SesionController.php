@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\EstadoSesion;
 use App\Enums\TipoTirada;
 use App\Models\Sesion;
+use App\Models\User;
 use App\Services\LecturaService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,9 +46,36 @@ class SesionController extends Controller
 
         $sesion = $this->lectura->entrar($sesion, $request->user());
 
+        $sesion->load('tarotista', 'consultante');
+
         return view('sesiones.mesa', [
-            'sesion' => $sesion->load('tarotista', 'consultante'),
+            'sesion' => $sesion,
+            'config' => $this->configMesa($sesion, $request->user()),
         ]);
+    }
+
+    /**
+     * Lo que el JS de la mesa necesita para arrancar. Nada de cartas:
+     * eso llega por GET /estado, con las mismas reglas que los eventos.
+     */
+    private function configMesa(Sesion $sesion, User $yo): array
+    {
+        return [
+            'uuid' => $sesion->uuid,
+            'yo' => ['id' => $yo->id, 'rol' => $yo->rol->value],
+            'tarotista' => $sesion->tarotista->name,
+            'tipo_tirada' => $sesion->tipo_tirada->value,
+            'posiciones' => $sesion->tipo_tirada->posiciones(),
+            'etiquetas' => collect(EstadoSesion::cases())->mapWithKeys(fn (EstadoSesion $e) => [$e->value => $e->etiqueta()]),
+            'link' => route('sesiones.show', $sesion),
+            'rutas' => [
+                'estado' => route('sesiones.estado', $sesion),
+                'mezclar' => route('sesiones.mezclar', $sesion),
+                'elegir' => route('sesiones.elegir', $sesion),
+                'revelar' => route('sesiones.revelar', $sesion),
+                'finalizar' => route('sesiones.finalizar', $sesion),
+            ],
+        ];
     }
 
     /** La consultante entra solo con su nombre. */
@@ -61,6 +91,12 @@ class SesionController extends Controller
         $request->session()->regenerate();
 
         return redirect()->route('sesiones.show', $sesion);
+    }
+
+    /** Foto de la mesa en JSON: para dibujar al entrar y para redibujar al reconectar. */
+    public function estado(Sesion $sesion): JsonResponse
+    {
+        return response()->json($this->lectura->estado($sesion));
     }
 
     public function resumen(Sesion $sesion): View

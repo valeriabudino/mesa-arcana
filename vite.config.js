@@ -10,6 +10,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/mesa/laboratorio.js',
+                'resources/js/mesa/mesa.js',
             ],
             refresh: true,
             fonts: [

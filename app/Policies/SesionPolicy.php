@@ -59,6 +59,12 @@ class SesionPolicy
         return $sesion->esTarotista($user);
     }
 
+    /** La foto de la mesa (GET /s/{uuid}/estado): solo quienes participan. */
+    public function verEstado(User $user, Sesion $sesion): bool
+    {
+        return $sesion->participa($user);
+    }
+
     public function verResumen(User $user, Sesion $sesion): bool
     {
         return $sesion->participa($user);

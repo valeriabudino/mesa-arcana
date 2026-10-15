@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('s/{sesion}')->name('sesiones.')->group(function () {
         Route::get('resumen', [SesionController::class, 'resumen'])->name('resumen')->can('verResumen', 'sesion');
+        Route::get('estado', [SesionController::class, 'estado'])->name('estado')->can('verEstado', 'sesion');
 
         Route::post('mezclar', [LecturaController::class, 'mezclar'])->name('mezclar')->can('mezclar', 'sesion');
         Route::post('elegir', [LecturaController::class, 'elegir'])->name('elegir')->can('elegir', 'sesion');

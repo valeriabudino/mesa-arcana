@@ -195,7 +195,59 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             gsap.to(carta.acostada.position, { y: activo ? 0.1 : 0, z: activo ? -0.12 : 0, duration: 0.2, overwrite: 'auto' });
         },
 
-        /** Vuelve todo al principio sin animar (para el laboratorio y, en la Fase 4, al redibujar). */
+        /**
+         * Dibuja de golpe la foto de GET /s/{uuid}/estado (al entrar o al reconectar).
+         * Las cartas sin revelar llegan solo con posicion e indice_abanico, igual que en CartaElegida.
+         */
+        async dibujar({ estado, cartas }) {
+            animaciones.reiniciar();
+            if (estado === 'esperando' || estado === 'lista') return; // el mazo quieto en el centro
+
+            // El abanico completo y, encima, las elegidas en su lugar de la tirada.
+            mazo.cartas.forEach((carta, i) => {
+                mazo.colocar(carta, lugarEnAbanico(i));
+                carta.enAbanico = true;
+            });
+            for (const elegida of cartas) {
+                const carta = mazo.cartas[elegida.indice_abanico];
+                carta.enAbanico = false;
+                carta.posicion = elegida.posicion;
+                mazo.porPosicion.set(elegida.posicion, carta);
+                mazo.colocar(carta, lugarEnTirada(tipoTirada, elegida.posicion));
+            }
+
+            if (estado === 'revelando' || estado === 'finalizada') {
+                mazo.cartas
+                    .filter((carta) => carta.enAbanico)
+                    .forEach((carta, k) => {
+                        carta.enAbanico = false;
+                        mazo.colocar(carta, { ...DESCARTE, y: k * PASO_PILA });
+                    });
+                const cerca = escena.enfocar(puntosDeLectura(tipoTirada));
+                vista.posicion.copy(cerca.posicion);
+                vista.objetivo.copy(cerca.objetivo);
+            }
+
+            await Promise.all(
+                cartas
+                    .filter((elegida) => elegida.revelada)
+                    .map(async (elegida) => {
+                        const carta = mazo.porPosicion.get(elegida.posicion);
+                        carta.revelada = true;
+                        try {
+                            mazo.ponerFrente(carta, await mazo.cargarFrente(elegida.carta.imagen));
+                        } catch (error) {
+                            console.warn('No se pudo cargar el frente de la carta', elegida.carta.imagen, error);
+                        }
+                        carta.volteo.rotation.y = 0;
+                        if (elegida.invertida) carta.pivote.rotation.y += Math.PI;
+                    }),
+            );
+
+            if (estado === 'finalizada') await animaciones.finalizar();
+        },
+
+        /** Vuelve todo al principio sin animar (para el laboratorio y al redibujar desde /estado). */
         reiniciar() {
             gsap.globalTimeline.clear();
             mazo.reiniciar();

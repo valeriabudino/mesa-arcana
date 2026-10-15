@@ -52,4 +52,37 @@ class SesionCarta extends Model
     {
         return $this->revelada_at !== null;
     }
+
+    /*
+    | Las DOS únicas funciones que deciden qué se publica de una carta elegida.
+    | Las usan los eventos (CartaElegida, CartaRevelada) y GET /s/{uuid}/estado,
+    | así lo que viaja por Reverb y lo que se ve al recargar no pueden divergir.
+    */
+
+    /** Elegida y boca abajo: dónde está, nada de qué carta es. */
+    public function datosElegida(): array
+    {
+        return [
+            'posicion' => $this->posicion,
+            'indice_abanico' => $this->indice_abanico,
+        ];
+    }
+
+    /** Revelada: recién acá va la carta, con el significado según cómo salió. */
+    public function datosRevelada(): array
+    {
+        $carta = $this->carta;
+
+        return [
+            'posicion' => $this->posicion,
+            'nombre_posicion' => $this->sesion->tipo_tirada->nombrePosicion($this->posicion),
+            'invertida' => $this->invertida,
+            'carta' => [
+                'nombre' => $carta->nombre,
+                'imagen' => $carta->urlImagen(),
+                'significado' => $this->invertida ? $carta->significado_invertido : $carta->significado_derecho,
+                'palabras_clave' => $carta->palabras_clave,
+            ],
+        ];
+    }
 }

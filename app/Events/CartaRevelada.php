@@ -12,7 +12,6 @@ class CartaRevelada implements ShouldBroadcastNow
     public function __construct(
         private string $uuid,
         private SesionCarta $sesionCarta,
-        private string $nombrePosicion,
     ) {}
 
     public function broadcastOn(): array
@@ -27,19 +26,6 @@ class CartaRevelada implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        $carta = $this->sesionCarta->carta;
-        $invertida = $this->sesionCarta->invertida;
-
-        return [
-            'posicion' => $this->sesionCarta->posicion,
-            'nombre_posicion' => $this->nombrePosicion,
-            'invertida' => $invertida,
-            'carta' => [
-                'nombre' => $carta->nombre,
-                'imagen' => $carta->urlImagen(),
-                'significado' => $invertida ? $carta->significado_invertido : $carta->significado_derecho,
-                'palabras_clave' => $carta->palabras_clave,
-            ],
-        ];
+        return $this->sesionCarta->datosRevelada();
     }
 }

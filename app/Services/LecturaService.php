@@ -141,7 +141,7 @@ class LecturaService
             return [$s, $elegida];
         });
 
-        broadcast(new CartaElegida($sesion->uuid, $elegida->posicion, $elegida->indice_abanico));
+        broadcast(new CartaElegida($sesion->uuid, $elegida));
 
         return $elegida;
     }
@@ -167,7 +167,7 @@ class LecturaService
             return [$s, $carta];
         });
 
-        broadcast(new CartaRevelada($sesion->uuid, $carta->load('carta'), $sesion->tipo_tirada->nombrePosicion($posicion)));
+        broadcast(new CartaRevelada($sesion->uuid, $carta->load('carta')->setRelation('sesion', $sesion)));
 
         return $carta;
     }
@@ -194,6 +194,34 @@ class LecturaService
         broadcast(new SesionFinalizada($sesion->uuid, route('sesiones.resumen', $sesion)));
 
         return $sesion;
+    }
+
+    /**
+     * Foto de la mesa para dibujar al entrar y redibujar al reconectar (GET /s/{uuid}/estado).
+     * Mismas reglas que los eventos: una carta sin revelar NO dice qué carta es.
+     *
+     * @return array{estado: string, consultante: string|null, cartas: list<array<string, mixed>>, url_resumen: string|null}
+     */
+    public function estado(Sesion $sesion): array
+    {
+        $sesion->load('consultante', 'cartas');
+
+        return [
+            'estado' => $sesion->estado->value,
+            'consultante' => $sesion->consultante?->name,
+            'cartas' => $sesion->cartas->map(function (SesionCarta $elegida) use ($sesion) {
+                if (! $elegida->estaRevelada()) {
+                    return ['revelada' => false] + $elegida->datosElegida();
+                }
+
+                // Solo para las reveladas se trae la carta de la base: lo que no se manda, ni se carga.
+                // indice_abanico ya viajó público en CartaElegida; hace falta para redibujar.
+                $elegida->setRelation('sesion', $sesion)->load('carta');
+
+                return ['revelada' => true] + $elegida->datosElegida() + $elegida->datosRevelada();
+            })->all(),
+            'url_resumen' => $sesion->estado === EstadoSesion::Finalizada ? route('sesiones.resumen', $sesion) : null,
+        ];
     }
 
     /**

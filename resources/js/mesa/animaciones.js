@@ -5,6 +5,7 @@
 import gsap from 'gsap';
 import * as THREE from 'three';
 import { DESCARTE, lugarDeCarta, lugarEnAbanico, MAZO, PASO_PILA, PILAS_MEZCLA, puntosDeLectura } from './layouts.js';
+import { crearCielo } from './cielo3d.js';
 import { RESALTE } from './mazo.js';
 import { reducirMovimiento } from './escena.js';
 import { crearTextoGrabado } from './texturas.js';
@@ -43,6 +44,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
     const lucesIniciales = Object.fromEntries(Object.entries(luces).map(([k, luz]) => [k, luz.intensity]));
 
     const lugarDe = (carta) => lugarDeCarta(tipoTirada, carta);
+    const cielo = crearCielo({ escena });
 
     // "SÍ / NO / QUIZÁS" grabado en dorado sobre el paño (solo en el sí o no).
     let grabado = null;
@@ -226,6 +228,9 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
          */
         volverAReposo() {
             const tl = gsap.timeline();
+            if (cielo.hayRueda()) cielo.salir(); // la rueda se achica en paralelo (termina antes que las cartas)
+            tl.to(luces.ambiente, { intensity: lucesIniciales.ambiente, duration: 1.2 }, 0);
+            tl.to(luces.luna, { intensity: lucesIniciales.luna, duration: 1.2 }, 0);
             mazo.cartas.forEach((carta, i) => {
                 carta.enAbanico = false;
                 tl.to(carta.volteo.rotation, { y: Math.PI, duration: 0.5, ease: SUAVE }, 0);
@@ -322,6 +327,22 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             );
         },
 
+        /** CartaAstralCalculada: la cámara sube y aparece la rueda zodiacal. */
+        entrarAlCielo(resultado) {
+            return cielo.entrar(resultado, { luces, lucesIniciales });
+        },
+
+        /** La rueda de golpe (al recargar o reconectar con la carta ya calculada). */
+        dibujarCielo(resultado) {
+            animaciones.reiniciar();
+            cielo.dibujar(resultado, { luces, lucesIniciales });
+        },
+
+        /** PlanetaSenalado: foco y cámara sobre el Sol, la Luna o el Ascendente. */
+        senalarPlaneta(clave) {
+            return cielo.senalar(clave);
+        },
+
         /** Cambia el tipo de tirada (cada lectura de la consulta puede ser de otro tipo). */
         usarTirada(tipo) {
             tipoTirada = tipo;
@@ -331,6 +352,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
         reiniciar() {
             gsap.globalTimeline.clear();
             quitarGrabado();
+            cielo.quitar();
             mazo.reiniciar();
             for (const [k, luz] of Object.entries(luces)) luz.intensity = lucesIniciales[k];
             escena.reencuadrar();

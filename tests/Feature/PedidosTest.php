@@ -71,8 +71,11 @@ describe('409: no es el momento', function () {
         expect(Lectura::count())->toBe(1);
     });
 
-    it('la carta astral todavía no se puede pedir', function () {
-        pedir('carta_astral')->assertConflict();
+    it('aceptar una carta astral la deja esperando los datos de nacimiento', function () {
+        pedir('carta_astral', null)->assertNoContent();
+        $this->actingAs($this->tarotista)->postJson(route('consultas.pedidos.aceptar', [$this->consulta, pedidoPendiente()]))->assertNoContent();
+
+        expect(Lectura::sole()->estado)->toBe(EstadoLectura::EsperandoDatos);
     });
 });
 

@@ -66,6 +66,8 @@ const hud = crearHud(config, {
     alCerrarLectura: () => accion(urlLectura('cerrar')),
     alPedir: (servicio, pregunta) => accion(config.rutas.pedidos, { servicio, pregunta: pregunta || null }),
     alPedirAclaratoria: (posicion, pregunta) => accion(urlLectura('aclaratoria'), { posicion, pregunta: pregunta || null }),
+    alEnviarNacimiento: (datos) => accion(urlLectura('nacimiento'), datos),
+    alSenalar: (planeta) => accion(urlLectura('senalar'), { planeta }),
     alFinalizar: () => window.confirm('¿Terminar la consulta?') && accion(config.rutas.finalizar),
     alAusente: () => accion(config.rutas.ausente),
 });
@@ -129,8 +131,15 @@ async function cargarEstado() {
     chat.habilitar(mesa.estadoConsulta === 'activa');
     refrescar();
 
-    if (foto.lectura) await animaciones.dibujar(foto.lectura);
-    else animaciones.reiniciar(); // sin lectura: el mazo quieto sobre la mesa
+    if (lectura.tipo === 'carta_astral') {
+        hud.mostrarCartaAstral(lectura);
+        if (lectura.resultado) animaciones.dibujarCielo(lectura.resultado);
+        else animaciones.reiniciar();
+    } else if (foto.lectura) {
+        await animaciones.dibujar(foto.lectura);
+    } else {
+        animaciones.reiniciar(); // sin lectura: el mazo quieto sobre la mesa
+    }
 }
 
 /** Los mensajes que faltan (todos al entrar; al reconectar, solo los posteriores al último visto). */
@@ -153,9 +162,40 @@ const alEventoDeLaMesa = {
         mesa.cartas = new Map();
         hud.limpiarReveladas();
         animaciones.reiniciar();
-        animaciones.usarTirada(lectura.tipo);
+        if (lectura.tipo !== 'carta_astral') animaciones.usarTirada(lectura.tipo);
         chat.mostrarPestana('lectura');
         refrescar();
+    },
+
+    // --- Carta astral ---
+
+    async DatosNacimientoRecibidos(payload) {
+        if (!esDeLaLectura(payload)) return;
+        mesa.lectura.calculando = true; // el servidor ya está calculando: el HUD lo dice
+        refrescar();
+    },
+
+    async CartaAstralCalculada({ lectura, resultado }) {
+        if (mesa.lectura?.id !== lectura || mesa.lectura.estado === 'calculada') return;
+        Object.assign(mesa.lectura, { estado: 'calculada', resultado, calculando: false });
+        hud.mostrarCartaAstral(mesa.lectura);
+        // Los datos de nacimiento no viajan por el canal (son personales): se piden a /estado,
+        // que solo responde a las dos participantes.
+        pedirEstado(config.rutas.estado)
+            .then((foto) => {
+                if (foto.lectura?.id !== lectura || mesa.lectura?.id !== lectura) return;
+                mesa.lectura.nacimiento = foto.lectura.nacimiento;
+                hud.mostrarCartaAstral(mesa.lectura);
+            })
+            .catch(() => {});
+        refrescar();
+        await animaciones.entrarAlCielo(resultado);
+    },
+
+    async PlanetaSenalado({ lectura, planeta }) {
+        if (mesa.lectura?.id !== lectura || mesa.lectura.estado !== 'calculada') return;
+        hud.resaltarPunto(planeta);
+        await animaciones.senalarPlaneta(planeta);
     },
 
     async EstadoCambiado({ lectura, estado }) {

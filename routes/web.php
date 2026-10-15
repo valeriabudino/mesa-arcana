@@ -2,6 +2,7 @@
 
 use App\Enums\TipoLectura;
 use App\Http\Controllers\AtencionController;
+use App\Http\Controllers\CartaAstralController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ConsultaController;
 use App\Http\Controllers\EsperaController;
@@ -82,6 +83,9 @@ Route::middleware('auth')->prefix('c/{consulta}')->name('consultas.')->scopeBind
         Route::post('revelar', [LecturaController::class, 'revelar'])->name('revelar')->can('revelar', 'lectura');
         Route::post('cerrar', [LecturaController::class, 'cerrar'])->name('cerrar')->can('cerrar', 'lectura');
         Route::post('aclaratoria', [LecturaController::class, 'pedirAclaratoria'])->name('aclaratoria')->can('pedirAclaratoria', 'lectura');
+        Route::post('nacimiento', [CartaAstralController::class, 'nacimiento'])->name('nacimiento')->can('enviarNacimiento', 'lectura')
+            ->middleware('throttle:10,1'); // cada envío corre un proceso de node
+        Route::post('senalar', [CartaAstralController::class, 'senalar'])->name('senalar')->can('senalar', 'lectura');
     });
 });
 

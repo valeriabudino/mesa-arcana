@@ -19,6 +19,17 @@
                     <p class="italic text-[#F3EBDD]/80">«{{ $lectura->pregunta }}»</p>
                 @endif
 
+                @if ($lectura->tipo === \App\Enums\TipoLectura::CartaAstral)
+                    @forelse ($lectura->resultado['puntos'] ?? [] as $clave => $punto)
+                        <div class="rounded-xl border border-[#C9A54C]/30 p-4">
+                            <p class="text-xs uppercase tracking-widest text-[#C9A54C]">{{ ['sol' => 'Sol', 'luna' => 'Luna', 'ascendente' => 'Ascendente'][$clave] }}</p>
+                            <p class="font-semibold">{{ $punto['signo_nombre'] }} {{ $punto['grado'] }}{{ $punto['aproximada'] ? ' (aproximada)' : '' }}</p>
+                            <p class="text-sm">{{ $punto['interpretacion'] }}</p>
+                        </div>
+                    @empty
+                        <p class="text-sm text-[#F3EBDD]/50">No se llegaron a cargar los datos de nacimiento.</p>
+                    @endforelse
+                @else
                 @forelse ($lectura->cartas as $elegida)
                     <div class="flex gap-4 rounded-xl border border-[#C9A54C]/30 p-4">
                         <img src="{{ $elegida->carta->urlImagen() }}" alt="{{ $elegida->carta->nombre }}"
@@ -33,6 +44,7 @@
                 @empty
                     <p class="text-sm text-[#F3EBDD]/50">No se llegó a revelar ninguna carta.</p>
                 @endforelse
+                @endif
             </section>
         @empty
             <p class="text-[#F3EBDD]/60">No se hicieron lecturas.</p>

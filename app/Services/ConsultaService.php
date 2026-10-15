@@ -13,6 +13,7 @@ use App\Events\EstadoCambiado;
 use App\Events\LecturaIniciada;
 use App\Events\PedidoResuelto;
 use App\Exceptions\AccionFueraDeOrden;
+use App\Models\Ciudad;
 use App\Models\Consulta;
 use App\Models\Lectura;
 use App\Models\Mensaje;
@@ -195,8 +196,33 @@ class ConsultaService
 
         return [
             'estado' => $consulta->estado->value,
-            'lectura' => $lectura?->tipo->esDeCartas() ? $this->cartas->foto($lectura->setRelation('consulta', $consulta)) : null,
+            'lectura' => match (true) {
+                $lectura === null => null,
+                $lectura->tipo->esDeCartas() => $this->cartas->foto($lectura->setRelation('consulta', $consulta)),
+                default => $this->fotoAstral($lectura),
+            },
             'url_resumen' => $finalizada ? route('consultas.resumen', $consulta) : null,
+        ];
+    }
+
+    /**
+     * Foto de una carta astral: el resultado (igual que en CartaAstralCalculada) y, para
+     * mostrarlos en la sala, los datos de nacimiento. /estado solo lo ven las dos participantes.
+     *
+     * @return array<string, mixed>
+     */
+    private function fotoAstral(Lectura $lectura): array
+    {
+        $datos = $lectura->datos_nacimiento;
+        $ciudad = $datos ? Ciudad::find($datos['ciudad_id']) : null;
+
+        return $lectura->datosPublicos() + [
+            'resultado' => $lectura->resultado,
+            'nacimiento' => $datos ? [
+                'fecha' => $datos['fecha'],
+                'hora' => $datos['hora'],
+                'lugar' => $ciudad ? "{$ciudad->nombre}, {$ciudad->provincia}" : null,
+            ] : null,
         ];
     }
 

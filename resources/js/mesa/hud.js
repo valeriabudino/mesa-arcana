@@ -51,11 +51,7 @@ export function crearHud(config, acciones) {
     function formularioPedido() {
         const tipo = document.createElement('select');
         tipo.className = 'campo-chico';
-        for (const [valor, { nombre, disponible }] of Object.entries(config.tipos)) {
-            const opcion = new Option(disponible ? nombre : `${nombre} (pronto)`, valor);
-            opcion.disabled = !disponible;
-            tipo.append(opcion);
-        }
+        for (const [valor, { nombre }] of Object.entries(config.tipos)) tipo.append(new Option(nombre, valor));
         const pregunta = document.createElement('input');
         pregunta.className = 'campo-chico w-64 max-w-full';
         pregunta.maxLength = 500;
@@ -84,6 +80,48 @@ export function crearHud(config, acciones) {
             carta,
             pregunta,
             boton('Pedir aclaratoria', () => acciones.alPedirAclaratoria(Number(carta.value), pregunta.value.trim())),
+        ];
+    }
+
+    /**
+     * Datos de nacimiento, como en las páginas de cartas astrales: provincia → ciudad.
+     * La provincia define la zona horaria (con su historia de cambios de horario);
+     * la ciudad, la latitud y la longitud que necesita el Ascendente.
+     */
+    function formularioNacimiento() {
+        const campo = (tipo, clase = 'campo-chico') => Object.assign(document.createElement(tipo), { className: clase });
+        const fecha = Object.assign(campo('input'), { type: 'date', max: new Date().toISOString().slice(0, 10), min: '1900-01-01', required: true });
+        const hora = Object.assign(campo('input'), { type: 'time', required: true });
+        const sinHora = Object.assign(document.createElement('input'), { type: 'checkbox', className: 'accent-[#C9A54C]' });
+        const etiquetaSinHora = Object.assign(document.createElement('label'), { className: 'flex items-center gap-1 text-xs' });
+        etiquetaSinHora.append(sinHora, 'No sé mi hora');
+        sinHora.addEventListener('change', () => (hora.disabled = sinHora.checked));
+
+        const provincia = campo('select');
+        const ciudad = campo('select');
+        const provincias = [...new Set(config.ciudades.map((c) => c.provincia))];
+        provincia.append(new Option('Provincia…', ''), ...provincias.map((p) => new Option(p, p)));
+        provincia.addEventListener('change', () => {
+            ciudad.replaceChildren(...config.ciudades.filter((c) => c.provincia === provincia.value).map((c) => new Option(c.nombre, c.id)));
+        });
+
+        return [
+            texto('Tu nacimiento:'),
+            fecha,
+            hora,
+            etiquetaSinHora,
+            provincia,
+            ciudad,
+            boton('Calcular mi carta', () => {
+                if (!fecha.value || !ciudad.value || (!sinHora.checked && !hora.value)) return hud.aviso('Completá la fecha, la hora (o «No sé mi hora») y la ciudad.');
+                acciones.alEnviarNacimiento({
+                    fecha: fecha.value,
+                    hora: sinHora.checked ? null : hora.value,
+                    hora_desconocida: sinHora.checked,
+                    ciudad_id: Number(ciudad.value),
+                });
+            }),
+            texto('¿Tu ciudad no está? Elegí la más cercana de tu provincia.', 'basis-full text-center text-xs text-[#F3EBDD]/50'),
         ];
     }
 
@@ -158,6 +196,27 @@ export function crearHud(config, acciones) {
                 return;
             }
 
+            // --- Carta astral ---
+            if (lectura.tipo === 'carta_astral') {
+                $('#estado').textContent = lectura.calculando ? 'Calculando…' : config.etiquetas[lectura.estado];
+                if (lectura.estado === 'esperando_datos') {
+                    if (soyTarotista) agregar(texto(lectura.calculando ? 'Calculando la carta…' : `Esperando los datos de nacimiento de ${config.consultante}…`));
+                    else if (lectura.calculando) agregar(texto('Calculando tu carta…'));
+                    else agregar(...formularioNacimiento());
+                } else if (soyTarotista) {
+                    for (const [clave, nombre] of Object.entries(config.puntos)) {
+                        if (lectura.resultado?.puntos[clave]) agregar(boton(`Señalar ${nombre}`, () => acciones.alSenalar(clave)));
+                    }
+                    agregar(boton('Cerrar lectura', acciones.alCerrarLectura));
+                } else {
+                    agregar(texto('Tu carta está lista: mirala en el panel y charlala en el chat.'));
+                }
+                if (soyTarotista) agregar(boton('Finalizar consulta', acciones.alFinalizar, true));
+                desactivar(barra, ocupada);
+
+                return;
+            }
+
             // --- Con una lectura en curso ---
             const { estado } = lectura;
             const cantidad = lectura.cartas_esperadas; // la tirada + las aclaratorias
@@ -204,6 +263,44 @@ export function crearHud(config, acciones) {
             // En orden de posición, aunque se revelen salteadas.
             const siguiente = [...$('#reveladas').children].find((li) => Number(li.dataset.posicion) > posicion);
             $('#reveladas').insertBefore(item, siguiente ?? null);
+        },
+
+        /** El panel de la carta astral: el nacimiento (si se ve) y la tríada con su interpretación. */
+        mostrarCartaAstral(lectura) {
+            hud.limpiarReveladas();
+            if (!lectura.resultado) return;
+            $('#sin-reveladas').hidden = true;
+
+            if (lectura.nacimiento) {
+                const { fecha, hora, lugar } = lectura.nacimiento;
+                const [a, m, d] = fecha.split('-');
+                const li = document.createElement('li');
+                li.append(texto(`Nació el ${d}/${m}/${a}${hora ? ` a las ${hora}` : ' (hora desconocida)'} en ${lugar}.`, 'text-xs text-[#F3EBDD]/60'));
+                $('#reveladas').append(li);
+            }
+            const iconos = { sol: '☉', luna: '☽', ascendente: 'AC' };
+            for (const [clave, punto] of Object.entries(lectura.resultado.puntos)) {
+                const li = document.createElement('li');
+                li.dataset.punto = clave;
+                li.className = 'rounded-lg p-2 transition-colors';
+                li.append(
+                    texto(`${iconos[clave]} ${config.puntos[clave].replace(/^(el|la) /, '').toUpperCase()}`, 'text-xs tracking-widest text-[#C9A54C]'),
+                    texto(`${punto.signo_nombre} ${punto.grado}${punto.aproximada ? ' (aproximada)' : ''}`, 'text-base font-semibold'),
+                    texto(punto.interpretacion),
+                );
+                $('#reveladas').append(li);
+            }
+            if (!lectura.resultado.hora_conocida) {
+                const li = document.createElement('li');
+                li.append(texto('Sin la hora de nacimiento no se puede calcular el Ascendente.', 'text-xs text-[#F3EBDD]/50'));
+                $('#reveladas').append(li);
+            }
+        },
+
+        /** PlanetaSenalado: el punto se ilumina en el panel. */
+        resaltarPunto(clave) {
+            document.querySelectorAll('[data-punto]').forEach((li) => li.classList.toggle('bg-[#2A1E4A]', li.dataset.punto === clave));
+            document.querySelector(`[data-punto="${clave}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         },
 
         limpiarReveladas() {

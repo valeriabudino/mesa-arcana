@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\EstadoLectura;
 use App\Enums\TipoLectura;
+use App\Models\Ciudad;
 use App\Models\Consulta;
 use App\Models\User;
+use App\Services\CartaAstralService;
 use App\Services\ConsultaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,8 +75,11 @@ class ConsultaController extends Controller
             'tarotista' => $consulta->tarotista->name,
             'consultante' => $consulta->consultante->name,
             'tipos' => collect(TipoLectura::cases())->mapWithKeys(fn (TipoLectura $t) => [
-                $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones(), 'disponible' => $t->esDeCartas(), 'aclaratorias' => $t->admiteAclaratorias()],
+                $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones(), 'aclaratorias' => $t->admiteAclaratorias()],
             ]),
+            // Para el formulario de nacimiento: provincia → ciudad (datos públicos).
+            'ciudades' => Ciudad::orderBy('provincia')->orderBy('nombre')->get(['id', 'nombre', 'provincia']),
+            'puntos' => CartaAstralService::PUNTOS,
             'etiquetas' => collect(EstadoLectura::cases())->mapWithKeys(fn (EstadoLectura $e) => [$e->value => $e->etiqueta()]),
             'rutas' => [
                 'estado' => route('consultas.estado', $consulta),

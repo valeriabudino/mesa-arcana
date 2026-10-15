@@ -44,10 +44,6 @@ class ChatService
      */
     public function pedir(Consulta $consulta, User $consultante, TipoLectura $servicio, ?string $pregunta): Mensaje
     {
-        if (! $servicio->esDeCartas()) {
-            throw new AccionFueraDeOrden('La carta astral llega pronto.');
-        }
-
         $mensaje = DB::transaction(function () use ($consulta, $consultante, $servicio, $pregunta) {
             $c = Consulta::whereKey($consulta->id)->lockForUpdate()->firstOrFail();
             $c->exigirEstado(EstadoConsulta::Activa);

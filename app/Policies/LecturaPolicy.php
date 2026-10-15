@@ -31,6 +31,17 @@ class LecturaPolicy
         return $lectura->consulta->esConsultante($user);
     }
 
+    /** Cargar los datos de nacimiento: la consultante (son suyos). */
+    public function enviarNacimiento(User $user, Lectura $lectura): bool
+    {
+        return $lectura->consulta->esConsultante($user);
+    }
+
+    public function senalar(User $user, Lectura $lectura): bool
+    {
+        return $lectura->consulta->esTarotista($user);
+    }
+
     public function cerrar(User $user, Lectura $lectura): bool
     {
         return $lectura->consulta->esTarotista($user);

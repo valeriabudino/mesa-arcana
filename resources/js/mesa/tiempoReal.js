@@ -10,6 +10,8 @@ export const EVENTOS = [
     'MensajeEnviado', 'PedidoResuelto', 'LecturaIniciada', 'EstadoCambiado', 'AclaratoriaAceptada', 'ConsultaFinalizada',
     // la mesa
     'MazoMezclado', 'CartaElegida', 'CartaRevelada',
+    // el cielo (carta astral)
+    'DatosNacimientoRecibidos', 'CartaAstralCalculada', 'PlanetaSenalado',
 ];
 
 export function conectar(uuid, manejadores) {

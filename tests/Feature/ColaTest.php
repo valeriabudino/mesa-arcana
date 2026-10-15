@@ -2,6 +2,7 @@
 
 use App\Enums\EstadoTurno;
 use App\Events\ColaActualizada;
+use App\Events\TurnoActualizado;
 use App\Events\TurnoCancelado;
 use App\Events\TurnoCreado;
 use App\Events\TurnoTomado;
@@ -132,4 +133,21 @@ it('la tarotista prende y apaga "Disponible"', function () {
     expect($this->tarotista->fresh()->disponible)->toBeFalse();
 
     $this->actingAs(User::factory()->invitada()->create())->postJson(route('atencion.disponible'), ['disponible' => true])->assertForbidden();
+});
+
+it('la consultante cambia su motivo mientras espera y las tarotistas lo ven', function () {
+    Event::fake([TurnoActualizado::class]);
+    $turno = Turno::factory()->create(['motivo' => 'Trabajo']);
+
+    $this->actingAs($turno->consultante)->postJson(route('turnos.motivo', $turno), ['motivo' => 'Amor'])->assertNoContent();
+
+    expect($turno->fresh()->motivo)->toBe('Amor');
+    Event::assertDispatched(TurnoActualizado::class, fn ($e) => $e->broadcastWith()['motivo'] === 'Amor');
+    $this->actingAs(User::factory()->invitada()->create())->postJson(route('turnos.motivo', $turno), ['motivo' => 'x'])->assertForbidden();
+});
+
+it('con el turno ya tomado, el motivo no se cambia', function () {
+    $turno = Turno::factory()->tomado()->create();
+
+    $this->actingAs($turno->consultante)->postJson(route('turnos.motivo', $turno), ['motivo' => 'x'])->assertConflict();
 });

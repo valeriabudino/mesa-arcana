@@ -128,6 +128,11 @@ window.Echo.private('tarotistas')
         turnos.set(turno.uuid, turno);
         dibujar();
     })
+    .listen('.TurnoActualizado', (turno) => {
+        if (!turnos.has(turno.uuid)) return;
+        turnos.set(turno.uuid, turno); // cambió el motivo
+        dibujar();
+    })
     .listen('.TurnoTomado', ({ uuid, tarotista }) => {
         if (tarotista !== config.yo) despedir(uuid, `Lo tomó ${tarotista}`);
     })

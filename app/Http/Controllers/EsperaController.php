@@ -7,6 +7,7 @@ use App\Services\ColaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -62,6 +63,14 @@ class EsperaController extends Controller
     public function estado(Request $request): JsonResponse
     {
         return response()->json($this->cola->estadoEspera($request->user()));
+    }
+
+    public function motivo(Request $request, Turno $turno): Response
+    {
+        $datos = $request->validate(['motivo' => ['nullable', 'string', 'max:200']]);
+        $this->cola->cambiarMotivo($turno, $datos['motivo'] ?? null);
+
+        return response()->noContent();
     }
 
     public function cancelar(Turno $turno): RedirectResponse

@@ -13,12 +13,13 @@ export default defineConfig({
                 'resources/js/mesa/mesa.js',
                 'resources/js/espera/salaEspera.js',
                 'resources/js/espera/panelAtencion.js',
+                'resources/js/inicio/inicio.js',
             ],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
-                }),
+                // Se descargan en el build y se sirven desde la app: el navegador no le pide nada a terceros.
+                bunny('Inter', { weights: [400, 500, 600] }),
+                bunny('Cinzel', { weights: [500, 600] }),
             ],
         }),
         tailwindcss(),

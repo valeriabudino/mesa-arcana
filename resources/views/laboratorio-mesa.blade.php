@@ -6,6 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Laboratorio de la mesa · {{ config('app.name') }}</title>
+    @fonts
     @vite(['resources/css/app.css', 'resources/js/mesa/laboratorio.js'])
 </head>
 <body class="h-dvh overflow-hidden bg-[#0E0B1A] font-sans text-[#F3EBDD]">

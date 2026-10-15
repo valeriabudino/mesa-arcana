@@ -6,6 +6,7 @@ use App\Enums\EstadoConsulta;
 use App\Enums\EstadoTurno;
 use App\Enums\Rol;
 use App\Events\ColaActualizada;
+use App\Events\TurnoActualizado;
 use App\Events\TurnoCancelado;
 use App\Events\TurnoCreado;
 use App\Events\TurnoTomado;
@@ -52,6 +53,23 @@ class ColaService
 
         $this->emitir(new TurnoCreado($turno->load('consultante')));
         $this->emitir(new ColaActualizada);
+
+        return $turno;
+    }
+
+    /** La consultante cambia el motivo mientras espera. */
+    public function cambiarMotivo(Turno $turno, ?string $motivo): Turno
+    {
+        $turno = DB::transaction(function () use ($turno, $motivo) {
+            $t = Turno::whereKey($turno->id)->lockForUpdate()->firstOrFail();
+            $t->exigirEstado(EstadoTurno::Esperando); // si ya la atendieron, no tiene sentido
+            $t->motivo = $motivo;
+            $t->save();
+
+            return $t;
+        });
+
+        $this->emitir(new TurnoActualizado($turno->load('consultante')));
 
         return $turno;
     }

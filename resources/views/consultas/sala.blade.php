@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Consulta · {{ config('app.name') }}</title>
+    @fonts
     @vite(['resources/css/app.css', 'resources/js/mesa/mesa.js'])
 </head>
 <body class="h-dvh overflow-hidden bg-[#0E0B1A] font-sans text-[#F3EBDD]">

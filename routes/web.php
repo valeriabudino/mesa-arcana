@@ -7,17 +7,11 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ConsultaController;
 use App\Http\Controllers\EsperaController;
 use App\Http\Controllers\LecturaController;
-use App\Http\Controllers\RemoteStyleController;
 use App\Models\Carta;
 use App\Models\Turno;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
-
-// Fase 0: prueba emisor → receptor de la guía (se quitan en la Fase 5)
-Route::get('/emisor', [RemoteStyleController::class, 'emisor'])->name('emisor');
-Route::post('/emitir', [RemoteStyleController::class, 'emitir'])->name('emitir');
-Route::get('/receptor', [RemoteStyleController::class, 'receptor'])->name('receptor');
 
 // Fase 3: laboratorio de la escena 3D (animaciones con botones, sin sockets). Solo en local.
 if (app()->isLocal()) {
@@ -48,6 +42,7 @@ Route::middleware('auth')->group(function () {
     Route::get('espera/estado', [EsperaController::class, 'estado'])->name('espera.estado');
     // El uuid del turno es público (viaja en sala-espera): la policy exige ser la dueña.
     Route::post('turnos/{turno}/cancelar', [EsperaController::class, 'cancelar'])->name('turnos.cancelar')->can('cancelar', 'turno');
+    Route::post('turnos/{turno}/motivo', [EsperaController::class, 'motivo'])->name('turnos.motivo')->can('cancelar', 'turno'); // misma regla: solo la dueña
 
     // Panel de atención (tarotista)
     Route::middleware('can:viewAny,'.Turno::class)->group(function () {

@@ -9,7 +9,16 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-titulo: 'Cinzel', 'Times New Roman', serif; /* títulos, nombres de cartas y signos */
+
+    /* La paleta del plan */
+    --color-noche: #0E0B1A;
+    --color-violeta: #2A1E4A;
+    --color-violeta-claro: #3A2A63;
+    --color-dorado: #C9A54C;
+    --color-marfil: #F3EBDD;
+    --color-rosa: #C97B8E;
 
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
@@ -23,16 +32,16 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    --color-accent: var(--color-dorado);
+    --color-accent-content: var(--color-dorado);
+    --color-accent-foreground: var(--color-noche);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: var(--color-dorado);
+        --color-accent-content: var(--color-dorado);
+        --color-accent-foreground: var(--color-noche);
     }
 }
 

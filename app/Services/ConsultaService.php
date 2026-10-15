@@ -48,11 +48,18 @@ class ConsultaService
             return $this->aceptarAclaratoria($pedido);
         }
 
-        [$consulta, $lectura] = DB::transaction(function () use ($pedido) {
+        [$consulta, $lectura, $anterior] = DB::transaction(function () use ($pedido) {
             [$c, $p] = $this->bloquearConPedido($pedido);
 
-            if ($c->lecturaActiva()->exists()) {
+            // Si la consultante la pidió con la lectura anterior ya terminada, esa se cierra sola.
+            $anterior = $c->lecturaActiva;
+            if ($anterior && ! $anterior->terminada()) {
                 throw new AccionFueraDeOrden('Ya hay una lectura en curso: cerrala antes de empezar otra.');
+            }
+            if ($anterior) {
+                $anterior->pasarA(EstadoLectura::Cerrada);
+                $anterior->cerrada_at = now();
+                $anterior->save();
             }
 
             $p->estado_pedido = EstadoPedido::Aceptado;
@@ -62,10 +69,14 @@ class ConsultaService
             $lectura->consulta_id = $c->id;
             $lectura->save();
 
-            return [$c, $lectura];
+            return [$c, $lectura, $anterior];
         });
 
         $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Aceptado->value));
+        if ($anterior) {
+            $this->emitir(new EstadoCambiado($consulta->uuid, $anterior->id, EstadoLectura::Cerrada->value));
+            $this->chat->sistema($consulta, "Se cerró la lectura: {$anterior->tipo->nombre()}.");
+        }
         $this->emitir(new LecturaIniciada($consulta->uuid, $lectura));
         $this->chat->sistema($consulta, "{$consulta->tarotista->name} aceptó: {$lectura->tipo->nombre()}.");
 
@@ -162,10 +173,10 @@ class ConsultaService
 
             $turno = Turno::whereKey($c->turno_id)->lockForUpdate()->firstOrFail();
             if ($turno->tomado_at->gt(now()->subMinutes(self::MINUTOS_PARA_AUSENTE))) {
-                throw new AccionFueraDeOrden('Esperá '.self::MINUTOS_PARA_AUSENTE.' minutos antes de marcarla ausente.');
+                throw new AccionFueraDeOrden('Esperá '.self::MINUTOS_PARA_AUSENTE.' minutos antes de marcar la ausencia.');
             }
             if ($c->lecturas()->exists() || $c->mensajes()->where('user_id', $c->consultante_id)->exists()) {
-                throw new AccionFueraDeOrden('La consultante ya participó de la consulta.');
+                throw new AccionFueraDeOrden("{$c->consultante->name} ya participó de la consulta.");
             }
 
             $turno->pasarA(EstadoTurno::Ausente);
@@ -177,7 +188,7 @@ class ConsultaService
             return $c;
         });
 
-        $this->chat->sistema($consulta, 'La consultante no llegó.');
+        $this->chat->sistema($consulta, "{$consulta->consultante->name} no llegó.");
         $this->emitir(new ConsultaFinalizada($consulta->uuid, route('consultas.resumen', $consulta)));
 
         return $consulta;

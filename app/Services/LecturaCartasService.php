@@ -122,8 +122,9 @@ class LecturaCartasService
         });
 
         $this->emitir(new CartaRevelada($lectura->consulta->uuid, $carta->load('carta')->setRelation('lectura', $lectura)));
-        // Sin el nombre: que la sorpresa la dé la carta girando, no el chat.
-        $this->chat->sistema($lectura->consulta, "{$lectura->consulta->tarotista->name} reveló la carta de «{$carta->nombrePosicion()}».");
+        // La carta entra al chat con su significado. El navegador la muestra recién cuando
+        // termina de girar en la mesa (mesa.js la encola detrás de la animación).
+        $this->chat->carta($carta);
 
         return $carta;
     }

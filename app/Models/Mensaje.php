@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $consulta_id
  * @property int|null $user_id (null = mensaje de sistema)
+ * @property int|null $lectura_id (en las cartas reveladas y la carta astral)
  * @property TipoMensaje $tipo
  * @property string $contenido
  * @property TipoLectura|null $servicio
@@ -56,6 +57,12 @@ class Mensaje extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    /** @return BelongsTo<Lectura, $this> */
+    public function lectura(): BelongsTo
+    {
+        return $this->belongsTo(Lectura::class);
+    }
+
     /**
      * Lo ÚNICO que se publica de un mensaje: lo usan el evento MensajeEnviado y
      * GET /c/{uuid}/mensajes. El contenido va tal cual se escribió (texto plano):
@@ -74,6 +81,28 @@ class Mensaje extends Model
             'estado_pedido' => $this->estado_pedido?->value,
             'ancla' => $this->ancla_tipo ? ['tipo' => $this->ancla_tipo->value, 'valor' => $this->ancla_valor] : null,
             'creado' => $this->created_at->toIso8601String(),
-        ];
+        ] + $this->datosDeLaLectura();
+    }
+
+    /**
+     * Las cartas reveladas y la carta astral llevan lo mismo que sus eventos
+     * (CartaRevelada, CartaAstralCalculada): ya son públicos para las dos.
+     * Los datos de nacimiento NO: son personales y se piden aparte a /estado.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosDeLaLectura(): array
+    {
+        if ($this->tipo === TipoMensaje::Carta) {
+            $carta = $this->lectura->cartas->firstWhere('posicion', (int) $this->ancla_valor);
+
+            return ['lectura' => $this->lectura_id, 'revelada' => $carta->setRelation('lectura', $this->lectura)->datosRevelada()];
+        }
+
+        if ($this->tipo === TipoMensaje::CartaAstral) {
+            return ['lectura' => $this->lectura_id, 'resultado' => $this->lectura->resultado];
+        }
+
+        return [];
     }
 }

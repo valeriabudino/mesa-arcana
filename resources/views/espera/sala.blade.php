@@ -6,6 +6,7 @@
 
 @section('fondo')
     <div id="fondo" class="fixed inset-0 opacity-70" aria-hidden="true"></div>
+    <div data-sonido class="fixed right-4 top-4 z-10"></div>
 @endsection
 
 @section('contenido')

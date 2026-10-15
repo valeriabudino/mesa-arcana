@@ -9,9 +9,12 @@ import { crearCielo } from './cielo3d.js';
 import { RESALTE } from './mazo.js';
 import { reducirMovimiento } from './escena.js';
 import { crearTextoGrabado } from './texturas.js';
+import { sonido } from '../sonido.js';
 
 const SUAVE = 'power2.inOut'; // el plan: lento y con peso, nada rebota
 const xyz = ({ x, y, z }) => ({ x, y, z });
+// Duraciones de sonido en segundos reales (con "reducir movimiento" las animaciones van más rápido).
+const real = (segundos) => segundos / gsap.globalTimeline.timeScale();
 
 /** Generador pseudoaleatorio con semilla (mulberry32): la misma semilla da la misma mezcla en los dos navegadores. */
 function generador(semilla) {
@@ -88,6 +91,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
 
                 // 1) Cada bloque va a su pila, un poco desprolijo.
                 const inicioCorte = tl.duration();
+                tl.call(() => sonido.cortar(), null, inicioCorte);
                 pilas.forEach((pila, p) =>
                     pila.forEach((carta, k) =>
                         volar(tl, carta, { ...PILAS_MEZCLA[p], y: k * PASO_PILA, rotY: (azar() - 0.5) * 0.08 }, inicioCorte, {
@@ -107,6 +111,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                     const p = quedan.findIndex((n) => (tirada -= n) < 0);
                     nuevo.push(pilas[p].shift());
                 }
+                tl.call(() => sonido.barajar(real(orden.length * 0.007 + 0.3)), null, inicioIntercalado + 0.1);
                 nuevo.forEach((carta, k) =>
                     volar(tl, carta, { ...MAZO, y: k * PASO_PILA }, inicioIntercalado + k * 0.007, { duracion: 0.32, altura: 0.25 }),
                 );
@@ -124,6 +129,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             const tl = gsap.timeline();
             const n = mazo.cartas.length;
             mazo.cartas.forEach((carta, i) => volar(tl, carta, lugarEnAbanico(i), (n - 1 - i) * 0.012, { duracion: 0.6, altura: 0.3 }));
+            tl.call(() => sonido.desplegar(real(n * 0.012 + 0.5)), null, 0.05);
 
             return tl.then(() => mazo.cartas.forEach((carta) => (carta.enAbanico = true)));
         },
@@ -145,6 +151,8 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             tl.to(carta.dorso, { emissiveIntensity: 0, duration: 0.3 }, 0);
             tl.to(carta.acostada.position, { y: 0, z: 0, duration: 0.3 }, 0);
             volar(tl, carta, lugarDe(carta), 0, { duracion: 0.9, altura: 1.1 });
+            tl.call(() => sonido.deslizar(), null, 0);
+            tl.call(() => sonido.apoyar(), null, 0.88);
 
             return tl.then();
         },
@@ -161,6 +169,8 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                 volar(tl, carta, { ...DESCARTE, y: k * PASO_PILA }, k * 0.01, { duracion: 0.5, altura: 0.25 });
             });
 
+            if (resto.length) tl.call(() => sonido.desplegar(real(resto.length * 0.01 + 0.4)), null, 0);
+
             const cerca = escena.enfocar(puntosDeLectura(tipoTirada));
             tl.to(vista.posicion, { ...xyz(cerca.posicion), duration: 1.6, ease: SUAVE }, 0.3);
             tl.to(vista.objetivo, { ...xyz(cerca.objetivo), duration: 1.6, ease: SUAVE }, 0.3);
@@ -176,6 +186,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             const tl = gsap.timeline();
             const libres = mazo.cartas.map((carta, i) => [carta, i]).filter(([carta]) => carta.posicion === null);
             libres.forEach(([carta, i], k) => volar(tl, carta, lugarEnAbanico(i), k * 0.01, { duracion: 0.6, altura: 0.3 }));
+            tl.call(() => sonido.desplegar(real(libres.length * 0.01 + 0.5)), null, 0);
 
             const toda = escena.enfocar(null);
             tl.to(vista.posicion, { ...xyz(toda.posicion), duration: 1.4, ease: SUAVE }, 0);
@@ -211,10 +222,12 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             // Salto, giro sobre su eje largo y, si salió invertida, media vuelta sobre la mesa.
             tl.to(carta.pivote.position, { y: lugar.y + 0.55, duration: 0.35, ease: 'power2.out' }, 0);
             tl.to(carta.volteo.rotation, { y: 0, duration: 0.7, ease: SUAVE }, 0.15);
+            tl.call(() => sonido.revelar(), null, 0.2);
             if (invertida) {
                 tl.to(carta.pivote.rotation, { y: lugar.rotY + Math.PI, duration: 0.7, ease: SUAVE }, 0.15);
             }
             tl.to(carta.pivote.position, { y: lugar.y, duration: 0.35, ease: 'power2.in' }, 0.75);
+            tl.call(() => sonido.apoyar(), null, 1.08);
 
             // Sí o no: la respuesta (calculada en el servidor) aparece grabada en el paño.
             if (respuesta) tl.to(ponerGrabado(respuesta.texto, lugar), { opacity: 1, duration: 1.2, ease: SUAVE }, 1.1);
@@ -237,6 +250,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                 tl.to(carta.acostada.position, { y: 0, z: 0, duration: 0.2 }, 0);
                 volar(tl, carta, { ...MAZO, y: i * PASO_PILA }, 0.3 + i * 0.006, { duracion: 0.6, altura: 0.35 });
             });
+            tl.call(() => sonido.desplegar(real(mazo.cartas.length * 0.006 + 0.5)), null, 0.35);
             if (grabado) tl.to(grabado.material, { opacity: 0, duration: 0.6 }, 0);
             tl.to(luces.foco, { intensity: 0, duration: 0.6 }, 0);
 
@@ -254,6 +268,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             const lejos = vista.posicion.clone().sub(vista.objetivo).multiplyScalar(1.15).add(vista.objetivo);
 
             tl.to(vista.posicion, { ...xyz(lejos), duration: 2.4, ease: SUAVE }, 0);
+            tl.call(() => sonido.momento(), null, 0.2);
             tl.to(luces.ambiente, { intensity: lucesIniciales.ambiente * 0.45, duration: 2 }, 0);
             tl.to(luces.luna, { intensity: lucesIniciales.luna * 0.4, duration: 2 }, 0);
             tl.to(luces.foco, { intensity: 0, duration: 1 }, 0);
@@ -270,6 +285,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             if (!carta?.enAbanico) return;
 
             if (activo) carta.dorso.emissive.copy(RESALTE[tipo]);
+            if (activo && tipo === 'propio') sonido.rozar();
             gsap.to(carta.dorso, { emissiveIntensity: activo ? 0.22 : 0, duration: 0.2, overwrite: 'auto' });
             gsap.to(carta.acostada.position, { y: activo ? 0.1 : 0, z: activo ? -0.12 : 0, duration: 0.2, overwrite: 'auto' });
         },
@@ -329,6 +345,8 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
 
         /** CartaAstralCalculada: la cámara sube y aparece la rueda zodiacal. */
         entrarAlCielo(resultado) {
+            sonido.momento();
+
             return cielo.entrar(resultado, { luces, lucesIniciales });
         },
 

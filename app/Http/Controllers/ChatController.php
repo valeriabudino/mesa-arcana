@@ -63,4 +63,11 @@ class ChatController extends Controller
 
         return response()->noContent();
     }
+
+    public function cancelar(Request $request, Consulta $consulta, Mensaje $mensaje): Response
+    {
+        $this->chat->cancelarPedido($mensaje, $request->user());
+
+        return response()->noContent();
+    }
 }

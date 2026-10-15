@@ -18,7 +18,10 @@
 
     <aside class="absolute left-3 top-3 w-72 space-y-3 rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/85 p-4 text-sm backdrop-blur">
         <div>
-            <h1 class="text-base font-semibold text-[#C9A54C]">Laboratorio de la mesa</h1>
+            <div class="flex items-center justify-between gap-2">
+                <h1 class="text-base font-semibold text-[#C9A54C]">Laboratorio de la mesa</h1>
+                <span data-sonido></span>
+            </div>
             <p class="text-xs text-[#F3EBDD]/60">Fase 3 · sin sockets. Cada botón arma el payload del evento y lo anima.</p>
         </div>
 

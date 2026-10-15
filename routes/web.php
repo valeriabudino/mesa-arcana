@@ -70,6 +70,8 @@ Route::middleware('auth')->prefix('c/{consulta}')->name('consultas.')->scopeBind
     // scopeBindings: {mensaje} tiene que ser de ESTA consulta.
     Route::post('pedidos/{mensaje}/aceptar', [ChatController::class, 'aceptar'])->name('pedidos.aceptar')->can('conducir', 'consulta');
     Route::post('pedidos/{mensaje}/rechazar', [ChatController::class, 'rechazar'])->name('pedidos.rechazar')->can('conducir', 'consulta');
+    // La consultante retira su pedido pendiente (ChatService verifica que sea suyo).
+    Route::post('pedidos/{mensaje}/cancelar', [ChatController::class, 'cancelar'])->name('pedidos.cancelar')->can('pedir', 'consulta');
 
     // scopeBindings: {lectura} tiene que ser de ESTA consulta (si no, 404).
     Route::prefix('lecturas/{lectura}')->name('lecturas.')->group(function () {

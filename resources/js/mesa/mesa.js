@@ -13,6 +13,7 @@ import { crearHud } from './hud.js';
 import { crearInteraccion } from './interaccion.js';
 import { crearMazo } from './mazo.js';
 import { conectar } from './tiempoReal.js';
+import '../sonido.js'; // monta los botones de música y efectos
 
 const config = JSON.parse(document.getElementById('datos-mesa').textContent);
 const soyTarotista = config.yo.rol === 'tarotista';
@@ -66,6 +67,10 @@ const hud = crearHud(config, {
     alCerrarLectura: () => accion(urlLectura('cerrar')),
     alPedir: (servicio, pregunta) => accion(config.rutas.pedidos, { servicio, pregunta: pregunta || null }),
     alPedirAclaratoria: (posicion, pregunta) => accion(urlLectura('aclaratoria'), { posicion, pregunta: pregunta || null }),
+    alCancelarPedido: () => {
+        const pedido = chat.pedidoPendiente();
+        if (pedido !== null) accion(`${config.rutas.pedidos}/${pedido}/cancelar`);
+    },
     alEnviarNacimiento: (datos) => accion(urlLectura('nacimiento'), datos),
     alSenalar: (planeta) => accion(urlLectura('senalar'), { planeta }),
     alFinalizar: () => window.confirm('¿Terminar la consulta?') && accion(config.rutas.finalizar),
@@ -84,6 +89,8 @@ const chat = crearChat(config, {
     // Para mostrar "Pidió aclarar «Presente»": la posición se nombra con la lectura en curso.
     nombrePosicion: (posicion) => (mesa.lectura ? config.tipos[mesa.lectura.tipo].posiciones[posicion] : null),
     alEscribir: () => red?.susurrarEscribiendo(),
+    // Los datos de nacimiento no viajan con el mensaje de la carta astral: se piden a /estado.
+    nacimientoDe: (lectura) => (mesa.lectura?.id === lectura ? mesa.lectura.nacimiento ?? null : null),
 });
 
 function refrescar() {
@@ -93,7 +100,6 @@ function refrescar() {
         lectura: mesa.lectura,
         cartas: [...mesa.cartas.values()],
         elegidas: mesa.cartas.size,
-        reveladas: [...mesa.cartas.values()].filter((c) => c.revelada).length,
         pedidoPendiente: chat.hayPedidoPendiente(),
         ocupada: mesa.ocupada,
     });
@@ -126,13 +132,11 @@ async function cargarEstado() {
     mesa.lectura = foto.lectura ? lectura : null;
     mesa.cartas = new Map(cartas.map((c) => [c.posicion, c]));
 
-    hud.limpiarReveladas();
-    cartas.filter((c) => c.revelada).forEach(hud.agregarRevelada);
     chat.habilitar(mesa.estadoConsulta === 'activa');
     refrescar();
 
     if (lectura.tipo === 'carta_astral') {
-        hud.mostrarCartaAstral(lectura);
+        chat.mostrarNacimiento(lectura.id, lectura.nacimiento);
         if (lectura.resultado) animaciones.dibujarCielo(lectura.resultado);
         else animaciones.reiniciar();
     } else if (foto.lectura) {
@@ -160,10 +164,8 @@ const alEventoDeLaMesa = {
         if (mesa.lectura?.id === lectura.id) return;
         mesa.lectura = lectura;
         mesa.cartas = new Map();
-        hud.limpiarReveladas();
         animaciones.reiniciar();
         if (lectura.tipo !== 'carta_astral') animaciones.usarTirada(lectura.tipo);
-        chat.mostrarPestana('lectura');
         refrescar();
     },
 
@@ -178,14 +180,13 @@ const alEventoDeLaMesa = {
     async CartaAstralCalculada({ lectura, resultado }) {
         if (mesa.lectura?.id !== lectura || mesa.lectura.estado === 'calculada') return;
         Object.assign(mesa.lectura, { estado: 'calculada', resultado, calculando: false });
-        hud.mostrarCartaAstral(mesa.lectura);
         // Los datos de nacimiento no viajan por el canal (son personales): se piden a /estado,
         // que solo responde a las dos participantes.
         pedirEstado(config.rutas.estado)
             .then((foto) => {
                 if (foto.lectura?.id !== lectura || mesa.lectura?.id !== lectura) return;
                 mesa.lectura.nacimiento = foto.lectura.nacimiento;
-                hud.mostrarCartaAstral(mesa.lectura);
+                chat.mostrarNacimiento(lectura, foto.lectura.nacimiento);
             })
             .catch(() => {});
         refrescar();
@@ -194,7 +195,7 @@ const alEventoDeLaMesa = {
 
     async PlanetaSenalado({ lectura, planeta }) {
         if (mesa.lectura?.id !== lectura || mesa.lectura.estado !== 'calculada') return;
-        hud.resaltarPunto(planeta);
+        chat.resaltarPunto(planeta);
         await animaciones.senalarPlaneta(planeta);
     },
 
@@ -248,16 +249,21 @@ const alEventoDeLaMesa = {
         mesa.cartas.set(payload.posicion, { ...elegida, ...payload, revelada: true }); // conserva indice_abanico
         if ([...mesa.cartas.values()].every((c) => c.revelada)) mesa.lectura.estado = 'abierta'; // ídem: lo hace el servidor solo
         refrescar();
-        await animaciones.revelar(payload);
-        hud.agregarRevelada(payload);
+        await animaciones.revelar(payload); // su mensaje en el chat llega detrás, por la cola
     },
 };
 
 // El chat no espera a las animaciones: se aplica en el momento.
 const alEventoDelChat = {
     MensajeEnviado(mensaje) {
-        chat.agregar(mensaje);
-        refrescar();
+        // Salvo las cartas: esas esperan su turno en la cola, para aparecer en el chat
+        // recién cuando terminaron de girar en la mesa (y no arruinar la sorpresa).
+        const mostrar = () => {
+            chat.agregar(mensaje);
+            refrescar();
+        };
+        if (mensaje.tipo === 'carta' || mensaje.tipo === 'carta_astral') encolar(mostrar);
+        else mostrar();
     },
     PedidoResuelto(datos) {
         chat.resolverPedido(datos);

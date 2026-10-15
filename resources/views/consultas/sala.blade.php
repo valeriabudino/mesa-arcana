@@ -11,16 +11,12 @@
     @fonts
     @vite(['resources/css/app.css', 'resources/js/mesa/mesa.js'])
 </head>
-<body class="h-dvh overflow-hidden bg-[#0E0B1A] font-sans text-[#F3EBDD]">
-    {{-- En pantallas anchas el canvas termina donde empieza el panel: la cámara se encuadra sola. --}}
-    <div id="lienzo" class="absolute inset-0 md:right-[21rem]"></div>
-
-    <div id="sin-webgl" hidden class="absolute inset-0 grid place-items-center p-6 text-center">
-        Tu navegador no tiene WebGL 2, así que no se puede dibujar la mesa 3D.
-    </div>
-
+{{-- En el celu todo va en columna (barra, mesa, panel, acciones) y el canvas ocupa solo el
+     espacio libre; en pantallas anchas el canvas termina donde empieza el panel.
+     Así la cámara siempre se encuadra en lo que de verdad se ve. --}}
+<body class="flex h-dvh flex-col overflow-hidden bg-[#0E0B1A] font-sans text-[#F3EBDD] md:block">
     {{-- Barra de presencia y estado --}}
-    <header class="absolute inset-x-0 top-0 flex flex-wrap items-center gap-x-5 gap-y-2 bg-gradient-to-b from-[#0E0B1A] to-transparent px-4 py-3 text-sm">
+    <header class="relative z-10 flex flex-wrap items-center gap-x-5 gap-y-1.5 bg-gradient-to-b from-[#0E0B1A] to-transparent px-4 py-2 text-sm md:absolute md:gap-y-2 md:py-3 md:inset-x-0 md:top-0">
         <span data-presencia="tarotista" class="flex items-center gap-2">
             <i class="size-2.5 rounded-full bg-zinc-600"></i>
             <span>{{ $consulta->tarotista->name }}</span>
@@ -32,27 +28,34 @@
             <span class="text-[#F3EBDD]/50">consultante</span>
         </span>
         <span id="tipo-lectura" class="ml-auto text-[#F3EBDD]/60"></span>
-        <strong id="estado" class="rounded-full border border-[#C97B8E]/50 px-3 py-1 text-[#C97B8E]">Conectando…</strong>
+        {{-- El estado y los botones de sonido van juntos: si no entran, bajan juntos de renglón. --}}
+        <span class="flex items-center gap-3">
+            <strong id="estado" class="rounded-full border border-[#C97B8E]/50 px-3 py-1 text-[#C97B8E]">Conectando…</strong>
+            <span data-sonido></span>
+        </span>
     </header>
+
+    <div id="lienzo" class="relative min-h-0 flex-1 md:absolute md:inset-0 md:right-[21rem]"></div>
+
+    <div id="sin-webgl" hidden class="absolute inset-0 grid place-items-center p-6 text-center">
+        Tu navegador no tiene WebGL 2, así que no se puede dibujar la mesa 3D.
+    </div>
 
     <div id="conexion" hidden class="absolute left-1/2 top-16 -translate-x-1/2 rounded-full bg-[#C97B8E] px-4 py-1.5 text-sm font-semibold text-[#0E0B1A]">
         Reconectando…
     </div>
 
-    {{-- Panel lateral con dos pestañas: la lectura y el chat. En el celu, abajo. --}}
-    <aside class="absolute inset-x-3 bottom-24 flex h-[38dvh] flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur md:inset-x-auto md:right-3 md:top-16 md:h-auto md:w-80">
-        <nav class="flex border-b border-[#C9A54C]/30" role="tablist">
-            <button data-pestana="lectura" role="tab" class="flex-1 px-3 py-2">Lectura</button>
-            <button data-pestana="chat" role="tab" class="flex-1 px-3 py-2">Chat <span id="no-leidos" hidden class="ml-1 rounded-full bg-[#C97B8E] px-1.5 text-xs text-[#0E0B1A]"></span></button>
-        </nav>
+    {{-- El chat: la conversación y también la lectura (cada carta revelada y la carta astral
+         llegan como mensajes). En pantallas anchas, a la derecha. En el celu, abajo y plegado:
+         se abre tocando la barra. --}}
+    <aside id="panel" data-plegado="true" class="relative mx-3 flex h-[45dvh] shrink-0 flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur data-[plegado=true]:h-auto md:absolute md:inset-x-auto md:bottom-24 md:right-3 md:top-16 md:mx-0 md:w-80 md:data-[plegado=true]:h-auto">
+        <button id="plegar" type="button" aria-controls="chat-cuerpo" aria-expanded="false" class="flex items-center gap-2 border-b border-[#C9A54C]/30 px-4 py-2.5 text-left md:pointer-events-none">
+            <span class="font-semibold text-[#C9A54C]">Chat y lectura</span>
+            <span id="no-leidos" hidden class="rounded-full bg-[#C97B8E] px-1.5 text-xs text-[#0E0B1A]"></span>
+            <svg viewBox="0 0 24 24" class="ml-auto size-5 text-[#C9A54C] transition-transform md:hidden" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+        </button>
 
-        <section data-panel="lectura" class="flex-1 space-y-3 overflow-auto p-4">
-            <p id="pregunta" hidden class="italic text-[#F3EBDD]/80"></p>
-            <ol id="reveladas" class="space-y-4"></ol>
-            <p id="sin-reveladas" class="text-[#F3EBDD]/50">Todavía no hay cartas reveladas.</p>
-        </section>
-
-        <section data-panel="chat" hidden class="flex min-h-0 flex-1 flex-col">
+        <div id="chat-cuerpo" class="flex min-h-0 flex-1 flex-col">
             <ol id="chat-lista" class="flex-1 space-y-2 overflow-auto p-3" aria-live="polite"></ol>
             <p id="escribiendo" class="h-5 px-3 text-xs italic text-[#F3EBDD]/50"></p>
             <form id="chat-form" class="flex gap-2 border-t border-[#C9A54C]/30 p-2">
@@ -60,11 +63,11 @@
                        class="min-w-0 flex-1 rounded-md border border-[#C9A54C]/40 bg-[#2A1E4A] px-2 py-1.5">
                 <button class="boton !px-3 !py-1.5">Enviar</button>
             </form>
-        </section>
+        </div>
     </aside>
 
     {{-- Barra de acción: cambia según rol × estado --}}
-    <footer id="acciones" class="absolute inset-x-0 bottom-0 flex flex-wrap items-center justify-center gap-3 bg-gradient-to-t from-[#0E0B1A] to-transparent p-4 text-sm"></footer>
+    <footer id="acciones" class="relative flex shrink-0 flex-wrap items-center justify-center gap-3 bg-gradient-to-t from-[#0E0B1A] to-transparent p-3 text-sm md:absolute md:inset-x-0 md:bottom-0 md:p-4"></footer>
 
     <div id="aviso" hidden role="alert" class="absolute bottom-20 left-1/2 -translate-x-1/2 rounded-lg border border-[#C97B8E] bg-[#0E0B1A] px-4 py-2 text-sm"></div>
 
@@ -72,7 +75,10 @@
         .boton { border-radius: .5rem; border: 1px solid rgb(201 165 76 / .6); background: #2A1E4A; padding: .55rem 1.1rem; font-weight: 600; }
         .boton:hover:not(:disabled) { background: #3A2A63; }
         .boton:disabled { opacity: .4; cursor: wait; }
-        [role=tab][aria-selected=true] { color: #C9A54C; box-shadow: inset 0 -2px #C9A54C; }
+        @media (max-width: 767.98px) {
+            #panel[data-plegado=true] #chat-cuerpo { display: none; }
+            #panel[data-plegado=false] #plegar svg { transform: rotate(180deg); }
+        }
         .campo-chico { border-radius: .375rem; border: 1px solid rgb(201 165 76 / .4); background: #2A1E4A; padding: .45rem .6rem; }
     </style>
 

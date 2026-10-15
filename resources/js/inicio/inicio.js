@@ -1,3 +1,4 @@
+import '../sonido.js';
 import { crearFondo } from './fondo3d.js';
 
 const lienzo = document.getElementById('fondo');

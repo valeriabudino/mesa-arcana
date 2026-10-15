@@ -68,7 +68,7 @@ class CartaAstralService
         $uuid = $lectura->consulta->uuid;
         $this->emitir(new DatosNacimientoRecibidos($uuid, $lectura->id));
         $this->emitir(new CartaAstralCalculada($uuid, $lectura->id, $resultado));
-        $this->chat->sistema($lectura->consulta, "Se calculó la carta astral de {$lectura->consulta->consultante->name}.");
+        $this->chat->cartaAstral($lectura);
 
         return $lectura;
     }

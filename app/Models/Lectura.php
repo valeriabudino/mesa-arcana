@@ -81,6 +81,12 @@ class Lectura extends Model
         ];
     }
 
+    /** ¿Ya terminó? Todas las cartas a la vista, o la carta astral calculada. Se puede pedir otra. */
+    public function terminada(): bool
+    {
+        return $this->estado === EstadoLectura::Abierta || $this->estado === EstadoLectura::Calculada;
+    }
+
     /**
      * ¿Se puede pedir una carta aclaratoria para la carta de esta posición?
      * Devuelve el motivo si no, o null si sí. (Lo usan al pedir y al aceptar.)

@@ -59,6 +59,49 @@ function luna(ctx, x, y, radio, haciaArriba) {
 }
 
 /**
+ * Fase lunar: k = 0 luna nueva, 0.5 llena, 1 nueva otra vez. Creciente con la luz a la
+ * derecha, menguante a la izquierda. El recorte con un círculo corrido es una aproximación,
+ * pero grabada en el paño no se nota.
+ */
+function faseLunar(ctx, x, y, radio, k) {
+    const lado = Math.ceil(radio * 2 + 6);
+    const [aparte, c] = lienzo(lado, lado);
+    const m = lado / 2;
+    const iluminada = (1 - Math.cos(2 * Math.PI * k)) / 2;
+
+    c.fillStyle = DORADO_CLARO;
+    c.beginPath();
+    c.arc(m, m, radio, 0, Math.PI * 2);
+    c.fill();
+    c.globalCompositeOperation = 'destination-out';
+    c.beginPath();
+    c.arc(m + (k < 0.5 ? -1 : 1) * 2 * radio * iluminada, m, radio * 1.02, 0, Math.PI * 2);
+    c.fill();
+    c.globalCompositeOperation = 'source-over';
+    c.strokeStyle = DORADO;
+    c.lineWidth = 2;
+    c.beginPath();
+    c.arc(m, m, radio, 0, Math.PI * 2);
+    c.stroke();
+
+    ctx.drawImage(aparte, x - m, y - m);
+}
+
+/** Constelación inventada: unas estrellas unidas por líneas finas. */
+function constelacion(ctx, cx, cy, tamano, azar) {
+    const estrellas = Array.from({ length: 5 + Math.floor(azar() * 3) }, () => [
+        cx + (azar() - 0.5) * tamano,
+        cy + (azar() - 0.5) * tamano * 0.7,
+    ]).sort((a, b) => a[0] - b[0]); // de izquierda a derecha: así las líneas no se cruzan tanto
+
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    estrellas.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.stroke();
+    for (const [x, y] of estrellas) estrella(ctx, x, y, 7 + azar() * 8);
+}
+
+/**
  * Dorso de las cartas. Es simétrico al girarlo 180°, como los mazos reales:
  * mirando el dorso no se puede saber si la carta va a salir invertida.
  */
@@ -152,6 +195,21 @@ export function crearPano(renderer, { ancho, profundidad, centroCirculo, radioCi
     }
     ctx.putImageData(imagen, 0, 0);
 
+    // Dibujos grabados (antes de la viñeta, así se van perdiendo en la oscuridad del borde).
+    let semilla = 23;
+    const azar = () => ((semilla = (semilla * 16807) % 2147483647) / 2147483647);
+
+    // Destellos sueltos por todo el paño.
+    ctx.fillStyle = 'rgba(230, 201, 120, 0.3)';
+    for (let i = 0; i < 160; i++) estrella(ctx, azar() * canvas.width, azar() * canvas.height, 4 + azar() * 7);
+
+    // Constelaciones a los costados de la tirada.
+    ctx.strokeStyle = 'rgba(201, 165, 76, 0.35)';
+    ctx.fillStyle = 'rgba(230, 201, 120, 0.6)';
+    for (const [x, z] of [[-6.6, -0.6], [-7.0, 1.9], [-5.2, 3.3], [6.7, -1.6], [6.9, 1.2], [5.4, 3.1], [-7.2, -3.4], [7.3, -3.9]]) {
+        constelacion(ctx, ...aPx(x, z), PX * 1.4, azar);
+    }
+
     // Viñeta: más oscuro hacia los bordes, como si solo iluminara la vela.
     const [vx, vy] = aPx(centroCirculo.x, centroCirculo.z);
     const vineta = ctx.createRadialGradient(vx, vy, PX * 2, vx, vy, PX * ancho * 0.6);
@@ -176,6 +234,32 @@ export function crearPano(renderer, { ancho, profundidad, centroCirculo, radioCi
         const a = (i * Math.PI) / 6;
         estrella(ctx, vx + (r - 11) * Math.cos(a), vy + (r - 11) * Math.sin(a), i % 3 === 0 ? 16 : 8);
     }
+
+    // Afuera, un anillo de astrolabio con rayitas...
+    const anillo = r + PX * 0.22;
+    ctx.strokeStyle = 'rgba(201, 165, 76, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(vx, vy, anillo, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 72; i++) {
+        const a = (i * Math.PI) / 36;
+        const largo = i % 6 === 0 ? 18 : 9;
+        ctx.beginPath();
+        ctx.moveTo(vx + anillo * Math.cos(a), vy + anillo * Math.sin(a));
+        ctx.lineTo(vx + (anillo + largo) * Math.cos(a), vy + (anillo + largo) * Math.sin(a));
+        ctx.stroke();
+    }
+
+    // ...y alrededor, el ciclo de la luna: nueva al fondo, llena adelante.
+    ctx.globalAlpha = 0.7;
+    const FASES = 12;
+    for (let i = 0; i < FASES; i++) {
+        const a = -Math.PI / 2 + (i * 2 * Math.PI) / FASES;
+        const distancia = anillo + PX * 0.4;
+        faseLunar(ctx, vx + distancia * Math.cos(a), vy + distancia * Math.sin(a), PX * 0.11, i / FASES);
+    }
+    ctx.globalAlpha = 1;
 
     return comoTextura(canvas, renderer);
 }

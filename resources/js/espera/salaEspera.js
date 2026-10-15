@@ -6,6 +6,7 @@
 // y repetirla en cada (re)suscripción, así no se pierde nada en el medio.
 
 import '../echo.js';
+import '../sonido.js';
 import { crearFondo } from '../inicio/fondo3d.js';
 import { enviar, pedirEstado } from '../mesa/api.js';
 
@@ -46,7 +47,7 @@ function mostrarPosicion(cola) {
     if (antes === -1) return false; // ya no estoy esperando (me atendieron o salí)
 
     $('#posicion').textContent =
-        antes === 0 ? 'Sos la próxima ✦' : `Hay ${antes} persona${antes === 1 ? '' : 's'} antes que vos`;
+        antes === 0 ? 'Tu turno es el próximo ✦' : `Hay ${antes} persona${antes === 1 ? '' : 's'} antes que vos`;
     if (antesPrevio !== null && antes !== antesPrevio) latir(); // el número "late" cuando cambia
     antesPrevio = antes;
 

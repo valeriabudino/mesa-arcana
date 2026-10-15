@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import WebGL from 'three/addons/capabilities/WebGL.js';
+import { crearDecoracion } from './decoracion.js';
 import { MAZO, puntosDeEncuadre } from './layouts.js';
 import { crearHalo, crearPano } from './texturas.js';
 
@@ -117,6 +118,16 @@ export function crearEscena(contenedor) {
     mesa.receiveShadow = true;
     escena.add(mesa);
 
+    // El paño sigue más allá de la textura, del color de su borde ya oscurecido por la viñeta:
+    // desde lejos (el celu parado) no se ve dónde termina la mesa.
+    const pisoLejano = new THREE.Mesh(
+        new THREE.PlaneGeometry(200, 200),
+        new THREE.MeshStandardMaterial({ color: '#100C1D', roughness: 0.95 }),
+    );
+    pisoLejano.rotation.x = -Math.PI / 2;
+    pisoLejano.position.y = -0.003;
+    escena.add(pisoLejano);
+
     // --- Vela ---
     const cera = new THREE.Mesh(
         new THREE.CylinderGeometry(0.16, 0.18, 0.7, 32),
@@ -133,6 +144,9 @@ export function crearEscena(contenedor) {
     const luzVela = new THREE.PointLight('#FFB36B', 6, 0, 1.4);
     luzVela.position.copy(VELA).setY(1.0);
     escena.add(cera, llama, luzVela);
+
+    // --- Velas, cristales, bola de cristal y frascos alrededor ---
+    const decoracion = crearDecoracion({ escena, renderer });
 
     // --- Polvo dorado flotando ---
     const CANTIDAD_POLVO = 300;
@@ -165,6 +179,11 @@ export function crearEscena(contenedor) {
         const encuadre = calcularEncuadre(camara, puntos);
         vista.posicion.copy(encuadre.posicion);
         vista.objetivo.copy(encuadre.objetivo);
+        // En pantallas angostas (el celu parado) la cámara se aleja mucho para que entre
+        // el abanico: si la niebla no se corre con ella, tapa toda la mesa.
+        const distancia = encuadre.posicion.distanceTo(encuadre.objetivo);
+        escena.fog.near = Math.max(14, distancia + 2);
+        escena.fog.far = Math.max(30, distancia + 18);
     };
     new ResizeObserver(ajustarTamano).observe(contenedor);
     ajustarTamano();
@@ -199,6 +218,8 @@ export function crearEscena(contenedor) {
                 );
             }
             posiciones.needsUpdate = true;
+
+            decoracion.animar(t);
 
             desvio.lerp(new THREE.Vector3(mouse.x * 0.35, -mouse.y * 0.2, 0), 0.04);
         }

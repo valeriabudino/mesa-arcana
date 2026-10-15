@@ -8,9 +8,11 @@ use App\Enums\TipoAncla;
 use App\Enums\TipoLectura;
 use App\Enums\TipoMensaje;
 use App\Events\MensajeEnviado;
+use App\Events\PedidoResuelto;
 use App\Exceptions\AccionFueraDeOrden;
 use App\Models\Consulta;
 use App\Models\Lectura;
+use App\Models\LecturaCarta;
 use App\Models\Mensaje;
 use App\Models\User;
 use App\Services\Concerns\EmiteEventos;
@@ -38,9 +40,29 @@ class ChatService
         return $this->crear($consulta, TipoMensaje::Sistema, $texto);
     }
 
+    /** Una carta revelada, como mensaje: la lectura se sigue en el chat. */
+    public function carta(LecturaCarta $carta): Mensaje
+    {
+        // El texto es la versión corta (la usa el resumen); el chat dibuja la carta completa.
+        $texto = "{$carta->nombrePosicion()}: {$carta->carta->nombre}".($carta->invertida ? ' (invertida)' : '');
+
+        return $this->crear($carta->lectura->consulta, TipoMensaje::Carta, $texto, lectura: $carta->lectura, posicion: $carta->posicion);
+    }
+
+    /** La carta astral calculada, como mensaje. */
+    public function cartaAstral(Lectura $lectura): Mensaje
+    {
+        $nombres = ['sol' => 'Sol', 'luna' => 'Luna', 'ascendente' => 'Ascendente'];
+        $puntos = collect($lectura->resultado['puntos'])->map(fn (array $p, string $clave) => "{$nombres[$clave]} en {$p['signo_nombre']}");
+
+        return $this->crear($lectura->consulta, TipoMensaje::CartaAstral, 'Carta astral: '.$puntos->join(', ', ' y ').'.', lectura: $lectura);
+    }
+
     /**
      * La consultante pide un servicio desde el chat. Con lock sobre la consulta:
-     * no puede haber dos pedidos pendientes ni pedir con una lectura en curso.
+     * no puede haber dos pedidos pendientes ni pedir con una lectura a medias.
+     * Con la lectura ya terminada (todas las cartas a la vista, o la carta astral
+     * calculada) sí: si la tarotista acepta, esa se cierra y arranca la nueva.
      */
     public function pedir(Consulta $consulta, User $consultante, TipoLectura $servicio, ?string $pregunta): Mensaje
     {
@@ -48,7 +70,7 @@ class ChatService
             $c = Consulta::whereKey($consulta->id)->lockForUpdate()->firstOrFail();
             $c->exigirEstado(EstadoConsulta::Activa);
 
-            if ($c->lecturaActiva()->exists()) {
+            if ($c->lecturaActiva && ! $c->lecturaActiva->terminada()) {
                 throw new AccionFueraDeOrden('Ya hay una lectura en curso.');
             }
             if ($c->mensajes()->where('estado_pedido', EstadoPedido::Pendiente)->exists()) {
@@ -115,23 +137,65 @@ class ChatService
      *
      * @return list<array<string, mixed>>
      */
+    /**
+     * La consultante retira su pedido (de servicio o de aclaratoria) mientras sigue
+     * pendiente: así puede elegir otra cosa. Con lock: si la tarotista justo lo
+     * respondió, gana la que llegó primero.
+     */
+    public function cancelarPedido(Mensaje $pedido, User $consultante): void
+    {
+        $consulta = DB::transaction(function () use ($pedido, $consultante) {
+            $c = Consulta::whereKey($pedido->consulta_id)->lockForUpdate()->firstOrFail();
+            $c->exigirEstado(EstadoConsulta::Activa);
+
+            $p = Mensaje::whereKey($pedido->id)->lockForUpdate()->firstOrFail();
+            if ($p->user_id !== $consultante->id) {
+                throw new AccionFueraDeOrden('Ese pedido no es tuyo.');
+            }
+            if ($p->estado_pedido !== EstadoPedido::Pendiente) {
+                throw new AccionFueraDeOrden('Ese pedido ya fue respondido.');
+            }
+            $p->estado_pedido = EstadoPedido::Cancelado;
+            $p->save();
+
+            return $c;
+        });
+
+        $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Cancelado->value));
+        $this->sistema($consulta, "{$consultante->name} canceló su pedido.");
+    }
+
     public function mensajes(Consulta $consulta, int $despues = 0): array
     {
         return $consulta->mensajes()
-            ->with('autora')
+            ->with(['autora', 'lectura.cartas.carta'])
             ->where('id', '>', $despues)
             ->get()
             ->map(fn (Mensaje $m) => $m->datosPublicos())
             ->all();
     }
 
-    private function crear(Consulta $consulta, TipoMensaje $tipo, string $contenido, ?User $autora = null): Mensaje
-    {
+    private function crear(
+        Consulta $consulta,
+        TipoMensaje $tipo,
+        string $contenido,
+        ?User $autora = null,
+        ?Lectura $lectura = null,
+        ?int $posicion = null,
+    ): Mensaje {
         $mensaje = new Mensaje(['contenido' => $contenido]);
         $mensaje->consulta_id = $consulta->id;
         $mensaje->user_id = $autora?->id;
+        $mensaje->lectura_id = $lectura?->id;
         $mensaje->tipo = $tipo;
+        if ($posicion !== null) {
+            $mensaje->ancla_tipo = TipoAncla::Carta;
+            $mensaje->ancla_valor = (string) $posicion;
+        }
         $mensaje->save();
+        if ($lectura) {
+            $mensaje->setRelation('lectura', $lectura->load('cartas.carta'));
+        }
 
         $this->emitir(new MensajeEnviado($consulta->uuid, $mensaje->setRelation('autora', $autora)));
 

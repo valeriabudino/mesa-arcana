@@ -10,6 +10,7 @@
 </head>
 <body class="min-h-dvh overflow-hidden bg-noche bg-[radial-gradient(ellipse_at_70%_40%,_#2A1E4A_0%,_#0E0B1A_65%)] font-sans text-marfil">
     <div id="fondo" class="fixed inset-0" data-frente="{{ asset('cartas/mayor-17.webp') }}" aria-hidden="true"></div>
+    <div data-sonido class="fixed right-4 top-4 z-10"></div>
 
     <main class="relative mx-auto flex min-h-dvh max-w-6xl items-end px-6 pb-16 md:items-center md:pb-0">
         <div class="max-w-md space-y-6">

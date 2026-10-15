@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Enums\EstadoConsulta;
 use App\Enums\EstadoPedido;
+use App\Enums\TipoAncla;
 use App\Enums\TipoLectura;
 use App\Enums\TipoMensaje;
 use App\Events\MensajeEnviado;
 use App\Exceptions\AccionFueraDeOrden;
 use App\Models\Consulta;
+use App\Models\Lectura;
 use App\Models\Mensaje;
 use App\Models\User;
 use App\Services\Concerns\EmiteEventos;
@@ -62,6 +64,45 @@ class ChatService
             $mensaje->user_id = $consultante->id;
             $mensaje->tipo = TipoMensaje::PedidoServicio;
             $mensaje->servicio = $servicio;
+            $mensaje->estado_pedido = EstadoPedido::Pendiente;
+            $mensaje->save();
+
+            return $mensaje;
+        });
+
+        $this->emitir(new MensajeEnviado($consulta->uuid, $mensaje->load('autora')));
+
+        return $mensaje;
+    }
+
+    /**
+     * La consultante pide una carta aclaratoria para la carta de una posición.
+     * Queda anclado a esa carta (para el hilo del chat y para saber qué aclarar).
+     */
+    public function pedirAclaratoria(Lectura $lectura, User $consultante, int $posicion, ?string $pregunta): Mensaje
+    {
+        $consulta = $lectura->consulta;
+
+        $mensaje = DB::transaction(function () use ($consulta, $lectura, $consultante, $posicion, $pregunta) {
+            $c = Consulta::whereKey($consulta->id)->lockForUpdate()->firstOrFail();
+            $c->exigirEstado(EstadoConsulta::Activa);
+
+            if ($c->lecturaActiva?->id !== $lectura->id) {
+                throw new AccionFueraDeOrden('Esa lectura ya no está en curso.');
+            }
+            if ($motivo = $lectura->fresh()->motivoParaNoAclarar($posicion)) {
+                throw new AccionFueraDeOrden($motivo);
+            }
+            if ($c->mensajes()->where('estado_pedido', EstadoPedido::Pendiente)->exists()) {
+                throw new AccionFueraDeOrden('Ya hay un pedido esperando respuesta.');
+            }
+
+            $mensaje = new Mensaje(['contenido' => $pregunta ?? '']);
+            $mensaje->consulta_id = $c->id;
+            $mensaje->user_id = $consultante->id;
+            $mensaje->tipo = TipoMensaje::PedidoAclaratoria;
+            $mensaje->ancla_tipo = TipoAncla::Carta;
+            $mensaje->ancla_valor = (string) $posicion;
             $mensaje->estado_pedido = EstadoPedido::Pendiente;
             $mensaje->save();
 

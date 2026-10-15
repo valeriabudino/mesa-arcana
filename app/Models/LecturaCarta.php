@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TipoLectura;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
@@ -51,6 +52,16 @@ class LecturaCarta extends Model
         return $this->belongsTo(Carta::class);
     }
 
+    /** "Pasado", o "Aclaración de «Pasado»" si es una aclaratoria. Necesita la lectura cargada. */
+    public function nombrePosicion(): string
+    {
+        $tipo = $this->lectura->tipo;
+
+        return $this->es_aclaratoria
+            ? 'Aclaración de «'.$tipo->nombrePosicion($this->aclara_posicion).'»'
+            : $tipo->nombrePosicion($this->posicion);
+    }
+
     public function estaRevelada(): bool
     {
         return $this->revelada_at !== null;
@@ -68,6 +79,7 @@ class LecturaCarta extends Model
         return [
             'posicion' => $this->posicion,
             'indice_abanico' => $this->indice_abanico,
+            'aclara' => $this->aclara_posicion, // a qué carta aclara (null si es de la tirada): público, sirve para ubicarla
         ];
     }
 
@@ -75,10 +87,11 @@ class LecturaCarta extends Model
     public function datosRevelada(): array
     {
         $carta = $this->carta;
+        $tipo = $this->lectura->tipo;
 
-        return [
+        $datos = [
             'posicion' => $this->posicion,
-            'nombre_posicion' => $this->lectura->tipo->nombrePosicion($this->posicion),
+            'nombre_posicion' => $this->nombrePosicion(),
             'invertida' => $this->invertida,
             'carta' => [
                 'nombre' => $carta->nombre,
@@ -87,5 +100,14 @@ class LecturaCarta extends Model
                 'palabras_clave' => $carta->palabras_clave,
             ],
         ];
+
+        // En el sí o no, la respuesta (calculada acá, con la regla de SiNo::segun) viaja
+        // recién con la carta revelada: antes no puede saberse, porque sale de la carta.
+        if ($tipo === TipoLectura::SiNo) {
+            $respuesta = $carta->si_no->segun($this->invertida);
+            $datos['respuesta'] = ['valor' => $respuesta->value, 'texto' => $respuesta->etiqueta()];
+        }
+
+        return $datos;
     }
 }

@@ -15,6 +15,8 @@ return new class extends Migration
             $table->enum('tipo', ['tres_cartas', 'si_no', 'cruz_celta', 'carta_astral']);
             $table->enum('estado', ['lista', 'eligiendo', 'revelando', 'abierta', 'esperando_datos', 'calculada', 'cerrada']);
             $table->string('pregunta', 500)->nullable();
+            $table->unsignedTinyInteger('cartas_esperadas')->default(0); // las de la tirada + 1 por cada aclaratoria aceptada
+            $table->unsignedTinyInteger('aclarando')->nullable();        // qué posición se está aclarando mientras se elige
             $table->json('orden_mazo')->nullable();       // solo tiradas. SECRETO: $hidden, nunca llega al navegador
             $table->json('datos_nacimiento')->nullable(); // solo carta astral: fecha, hora, ciudad_id
             $table->json('resultado')->nullable();        // solo carta astral: posiciones calculadas

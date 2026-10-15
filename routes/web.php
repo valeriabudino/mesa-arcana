@@ -81,6 +81,7 @@ Route::middleware('auth')->prefix('c/{consulta}')->name('consultas.')->scopeBind
         Route::post('elegir', [LecturaController::class, 'elegir'])->name('elegir')->can('elegir', 'lectura');
         Route::post('revelar', [LecturaController::class, 'revelar'])->name('revelar')->can('revelar', 'lectura');
         Route::post('cerrar', [LecturaController::class, 'cerrar'])->name('cerrar')->can('cerrar', 'lectura');
+        Route::post('aclaratoria', [LecturaController::class, 'pedirAclaratoria'])->name('aclaratoria')->can('pedirAclaratoria', 'lectura');
     });
 });
 

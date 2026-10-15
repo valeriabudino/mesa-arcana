@@ -26,6 +26,11 @@ class LecturaPolicy
         return $lectura->consulta->esTarotista($user);
     }
 
+    public function pedirAclaratoria(User $user, Lectura $lectura): bool
+    {
+        return $lectura->consulta->esConsultante($user);
+    }
+
     public function cerrar(User $user, Lectura $lectura): bool
     {
         return $lectura->consulta->esTarotista($user);

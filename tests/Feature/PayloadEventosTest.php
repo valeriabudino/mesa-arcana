@@ -26,12 +26,12 @@ beforeEach(function () {
     $this->elegida = $this->lectura->cartas()->with('carta')->sole();
 });
 
-it('CartaElegida NO filtra la carta: solo lectura, posicion e indice_abanico', function () {
+it('CartaElegida NO filtra la carta: solo lectura, posicion, indice_abanico y a qué carta aclara', function () {
     Event::assertDispatched(CartaElegida::class, function (CartaElegida $evento) {
         $payload = $evento->broadcastWith();
         $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
-        expect($payload)->toBe(['lectura' => $this->lectura->id, 'posicion' => 0, 'indice_abanico' => 5])  // ni una clave más
+        expect($payload)->toBe(['lectura' => $this->lectura->id, 'posicion' => 0, 'indice_abanico' => 5, 'aclara' => null])  // ni una clave más
             ->and($json)->not->toContain($this->elegida->carta->nombre)
             ->and($json)->not->toContain('carta')
             ->and($json)->not->toContain('invertida');

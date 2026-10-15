@@ -6,6 +6,8 @@ use App\Enums\EstadoConsulta;
 use App\Enums\EstadoLectura;
 use App\Enums\EstadoPedido;
 use App\Enums\EstadoTurno;
+use App\Enums\TipoMensaje;
+use App\Events\AclaratoriaAceptada;
 use App\Events\ConsultaFinalizada;
 use App\Events\EstadoCambiado;
 use App\Events\LecturaIniciada;
@@ -36,10 +38,15 @@ class ConsultaService
     ) {}
 
     /**
-     * La tarotista acepta un pedido del chat: nace la lectura de ese tipo.
+     * La tarotista acepta un pedido del chat: un servicio (nace una lectura)
+     * o una carta aclaratoria (la lectura abierta vuelve a Eligiendo).
      */
     public function aceptarPedido(Mensaje $pedido): Lectura
     {
+        if ($pedido->tipo === TipoMensaje::PedidoAclaratoria) {
+            return $this->aceptarAclaratoria($pedido);
+        }
+
         [$consulta, $lectura] = DB::transaction(function () use ($pedido) {
             [$c, $p] = $this->bloquearConPedido($pedido);
 
@@ -60,6 +67,28 @@ class ConsultaService
         $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Aceptado->value));
         $this->emitir(new LecturaIniciada($consulta->uuid, $lectura));
         $this->chat->sistema($consulta, "{$consulta->tarotista->name} aceptó: {$lectura->tipo->nombre()}.");
+
+        return $lectura;
+    }
+
+    private function aceptarAclaratoria(Mensaje $pedido): Lectura
+    {
+        $aclara = (int) $pedido->ancla_valor;
+
+        [$consulta, $lectura] = DB::transaction(function () use ($pedido, $aclara) {
+            [$c, $p] = $this->bloquearConPedido($pedido);
+            $lectura = $c->lecturaActiva ?? throw new AccionFueraDeOrden('No hay una lectura en curso.');
+
+            $lectura = $this->cartas->aceptarAclaratoria($lectura, $aclara);
+            $p->estado_pedido = EstadoPedido::Aceptado;
+            $p->save();
+
+            return [$c, $lectura];
+        });
+
+        $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Aceptado->value));
+        $this->emitir(new AclaratoriaAceptada($consulta->uuid, $lectura->id, $aclara));
+        $this->chat->sistema($consulta, "{$consulta->tarotista->name} aceptó aclarar «{$lectura->tipo->nombrePosicion($aclara)}».");
 
         return $lectura;
     }

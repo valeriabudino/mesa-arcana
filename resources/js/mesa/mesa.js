@@ -30,7 +30,7 @@ const animaciones = crearAnimaciones({ escena, mazo, tipoTirada: 'tres_cartas' }
 // lectura = la lectura activa ({ id, tipo, estado, pregunta }) o null.
 const mesa = { cargada: false, estadoConsulta: 'activa', urlResumen: null, lectura: null, cartas: new Map(), ocupada: false };
 
-const cantidad = () => config.tipos[mesa.lectura.tipo].posiciones.length;
+const cantidad = () => mesa.lectura.cartas_esperadas; // la tirada + las aclaratorias aceptadas
 const esDeLaLectura = (payload) => mesa.lectura !== null && payload.lectura === mesa.lectura.id;
 
 // --- Acciones: POST y nada más ---
@@ -65,6 +65,7 @@ const hud = crearHud(config, {
     },
     alCerrarLectura: () => accion(urlLectura('cerrar')),
     alPedir: (servicio, pregunta) => accion(config.rutas.pedidos, { servicio, pregunta: pregunta || null }),
+    alPedirAclaratoria: (posicion, pregunta) => accion(urlLectura('aclaratoria'), { posicion, pregunta: pregunta || null }),
     alFinalizar: () => window.confirm('¿Terminar la consulta?') && accion(config.rutas.finalizar),
     alAusente: () => accion(config.rutas.ausente),
 });
@@ -78,6 +79,8 @@ const chat = crearChat(config, {
         (error) => (hud.aviso(error.message), false),
     ),
     alResponderPedido: (id, aceptar) => accion(`${config.rutas.pedidos}/${id}/${aceptar ? 'aceptar' : 'rechazar'}`),
+    // Para mostrar "Pidió aclarar «Presente»": la posición se nombra con la lectura en curso.
+    nombrePosicion: (posicion) => (mesa.lectura ? config.tipos[mesa.lectura.tipo].posiciones[posicion] : null),
     alEscribir: () => red?.susurrarEscribiendo(),
 });
 
@@ -86,6 +89,7 @@ function refrescar() {
         estadoConsulta: mesa.estadoConsulta,
         urlResumen: mesa.urlResumen,
         lectura: mesa.lectura,
+        cartas: [...mesa.cartas.values()],
         elegidas: mesa.cartas.size,
         reveladas: [...mesa.cartas.values()].filter((c) => c.revelada).length,
         pedidoPendiente: chat.hayPedidoPendiente(),
@@ -158,8 +162,16 @@ const alEventoDeLaMesa = {
         if (mesa.lectura?.id !== lectura || estado !== 'cerrada') return;
         mesa.lectura = null;
         mesa.cartas = new Map();
-        animaciones.reiniciar(); // vuelve el mazo quieto: lista para la próxima
         refrescar();
+        await animaciones.volverAReposo(); // el mazo vuelve a la pila: listo para la próxima
+    },
+
+    async AclaratoriaAceptada(payload) {
+        if (!esDeLaLectura(payload) || mesa.lectura.estado !== 'abierta') return;
+        mesa.lectura.estado = 'eligiendo';
+        mesa.lectura.cartas_esperadas++;
+        refrescar();
+        await animaciones.reabrirAbanico();
     },
 
     async ConsultaFinalizada({ url_resumen }) {

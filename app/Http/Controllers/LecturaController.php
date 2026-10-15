@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Carta;
 use App\Models\Consulta;
 use App\Models\Lectura;
+use App\Services\ChatService;
 use App\Services\ConsultaService;
 use App\Services\LecturaCartasService;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class LecturaController extends Controller
     public function __construct(
         private LecturaCartasService $cartas,
         private ConsultaService $consultas,
+        private ChatService $chat,
     ) {}
 
     public function mezclar(Consulta $consulta, Lectura $lectura): Response
@@ -44,7 +46,7 @@ class LecturaController extends Controller
     public function revelar(Request $request, Consulta $consulta, Lectura $lectura): Response
     {
         $datos = $request->validate([
-            'posicion' => ['required', 'integer', 'min:0', 'max:'.max(0, $lectura->tipo->cantidad() - 1)],
+            'posicion' => ['required', 'integer', 'min:0', 'max:'.max(0, $lectura->cartas_esperadas - 1)],
         ]);
 
         $this->cartas->revelar($lectura, $datos['posicion']);
@@ -55,6 +57,19 @@ class LecturaController extends Controller
     public function cerrar(Consulta $consulta, Lectura $lectura): Response
     {
         $this->consultas->cerrarLectura($lectura);
+
+        return response()->noContent();
+    }
+
+    /** La consultante pide aclarar una carta (queda como pedido en el chat). */
+    public function pedirAclaratoria(Request $request, Consulta $consulta, Lectura $lectura): Response
+    {
+        $datos = $request->validate([
+            'posicion' => ['required', 'integer', 'min:0'],
+            'pregunta' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $this->chat->pedirAclaratoria($lectura, $request->user(), $datos['posicion'], $datos['pregunta'] ?? null);
 
         return response()->noContent();
     }

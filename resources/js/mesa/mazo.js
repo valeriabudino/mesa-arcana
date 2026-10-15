@@ -41,7 +41,7 @@ export function crearMazo({ escena, renderer }) {
         acostada.add(volteo);
         escena.add(pivote);
 
-        const carta = { pivote, acostada, volteo, dorso, frente: null, enAbanico: false, posicion: null, revelada: false };
+        const carta = { pivote, acostada, volteo, dorso, frente: null, enAbanico: false, posicion: null, aclara: null, revelada: false };
         volteo.userData.carta = carta; // para saber qué carta tocó el raycaster
 
         return carta;
@@ -67,6 +67,7 @@ export function crearMazo({ escena, renderer }) {
                 carta.dorso.emissiveIntensity = 0;
                 carta.enAbanico = false;
                 carta.posicion = null;
+                carta.aclara = null;
                 carta.revelada = false;
                 if (carta.frente) {
                     carta.frente.map?.dispose();

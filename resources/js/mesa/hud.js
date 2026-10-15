@@ -69,6 +69,24 @@ export function crearHud(config, acciones) {
         ];
     }
 
+    /** La consultante pide aclarar una de las cartas reveladas (que todavía no tenga aclaratoria). */
+    function formularioAclaratoria(lectura, aclarables) {
+        const carta = document.createElement('select');
+        carta.className = 'campo-chico';
+        for (const c of aclarables) carta.append(new Option(config.tipos[lectura.tipo].posiciones[c.posicion], c.posicion));
+        const pregunta = document.createElement('input');
+        pregunta.className = 'campo-chico w-56 max-w-full';
+        pregunta.maxLength = 500;
+        pregunta.placeholder = '¿Qué querés aclarar? (opcional)';
+
+        return [
+            texto('¿Te queda una duda?'),
+            carta,
+            pregunta,
+            boton('Pedir aclaratoria', () => acciones.alPedirAclaratoria(Number(carta.value), pregunta.value.trim())),
+        ];
+    }
+
     const hud = {
         /** Quiénes están conectadas ahora (presencia): here() trae la lista, joining/leaving los cambios. */
         presencia(lista) {
@@ -105,7 +123,7 @@ export function crearHud(config, acciones) {
         },
 
         /** Estado + barra de acción: cada una ve solo lo que puede hacer en este momento. */
-        mostrar({ estadoConsulta, urlResumen, lectura, elegidas, reveladas, pedidoPendiente, ocupada }) {
+        mostrar({ estadoConsulta, urlResumen, lectura, cartas, elegidas, reveladas, pedidoPendiente, ocupada }) {
             const barra = $('#acciones');
             barra.replaceChildren();
             const agregar = (...elementos) => barra.append(...elementos);
@@ -142,7 +160,7 @@ export function crearHud(config, acciones) {
 
             // --- Con una lectura en curso ---
             const { estado } = lectura;
-            const cantidad = config.tipos[lectura.tipo].posiciones.length;
+            const cantidad = lectura.cartas_esperadas; // la tirada + las aclaratorias
             $('#estado').textContent = config.etiquetas[estado] + (estado === 'eligiendo' ? ` ${elegidas}/${cantidad}` : '');
 
             if (soyTarotista) {
@@ -157,14 +175,21 @@ export function crearHud(config, acciones) {
                 if (estado === 'lista') agregar(texto(`${config.tarotista} va a mezclar el mazo.`));
                 if (estado === 'eligiendo') agregar(texto(`Elegí ${cantidad - elegidas} carta${cantidad - elegidas === 1 ? '' : 's'} del abanico.`));
                 if (estado === 'revelando') agregar(texto(`${config.tarotista} está revelando tus cartas…`));
-                if (estado === 'abierta') agregar(texto(`Ya se revelaron ${reveladas} cartas. Charlalas en el chat.`));
+                if (estado === 'abierta') {
+                    const aclarables = config.tipos[lectura.tipo].aclaratorias
+                        ? cartas.filter((c) => c.aclara === null && !cartas.some((o) => o.aclara === c.posicion))
+                        : [];
+                    if (pedidoPendiente) agregar(texto(`Esperando que ${config.tarotista} responda tu pedido…`));
+                    else if (aclarables.length) agregar(...formularioAclaratoria(lectura, aclarables));
+                    else agregar(texto(reveladas === 1 ? 'Ya se reveló la carta. Charlala en el chat.' : `Ya se revelaron ${reveladas} cartas. Charlalas en el chat.`));
+                }
             }
 
             desactivar(barra, ocupada);
         },
 
         /** Agrega una carta revelada al panel lateral (payload de CartaRevelada). */
-        agregarRevelada({ posicion, nombre_posicion: lugar, invertida, carta }) {
+        agregarRevelada({ posicion, nombre_posicion: lugar, invertida, carta, respuesta = null }) {
             $('#sin-reveladas').hidden = true;
             const item = document.createElement('li');
             item.dataset.posicion = posicion;
@@ -172,6 +197,7 @@ export function crearHud(config, acciones) {
                 texto(lugar.toUpperCase(), 'text-xs tracking-widest text-[#C9A54C]'),
                 texto(carta.nombre, 'text-base font-semibold'),
                 texto(invertida ? 'Invertida' : 'Al derecho', 'text-xs text-[#C97B8E]'),
+                ...(respuesta ? [texto(`Respuesta: ${respuesta.texto}`, 'text-base font-semibold text-[#C9A54C]')] : []),
                 texto(carta.significado),
                 texto(carta.palabras_clave.join(' · '), 'text-xs text-[#F3EBDD]/50'),
             );

@@ -72,6 +72,7 @@ class Mensaje extends Model
             'contenido' => $this->contenido,
             'servicio' => $this->servicio?->value,
             'estado_pedido' => $this->estado_pedido?->value,
+            'ancla' => $this->ancla_tipo ? ['tipo' => $this->ancla_tipo->value, 'valor' => $this->ancla_valor] : null,
             'creado' => $this->created_at->toIso8601String(),
         ];
     }

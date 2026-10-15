@@ -192,3 +192,21 @@ export function crearHalo(renderer, color = '255, 190, 110') {
 
     return comoTextura(canvas, renderer);
 }
+
+/** "SÍ", "NO" o "QUIZÁS" grabado en dorado, para apoyar sobre el paño (fondo transparente). */
+export function crearTextoGrabado(renderer, texto) {
+    const [canvas, ctx] = lienzo(1024, 384);
+    ctx.font = '600 230px Cinzel, "Times New Roman", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(230, 201, 120, 0.9)';
+    ctx.shadowBlur = 28;
+    const brillo = ctx.createLinearGradient(0, 60, 0, 330);
+    brillo.addColorStop(0, '#F6E2A4');
+    brillo.addColorStop(0.5, DORADO);
+    brillo.addColorStop(1, '#8E6F2A');
+    ctx.fillStyle = brillo;
+    ctx.fillText(texto.toUpperCase(), 512, 200);
+
+    return comoTextura(canvas, renderer);
+}

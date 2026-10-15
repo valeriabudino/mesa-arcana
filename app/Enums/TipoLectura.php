@@ -30,6 +30,12 @@ enum TipoLectura: string
         return $this !== self::CartaAstral;
     }
 
+    /** ¿Se pueden pedir cartas aclaratorias? (En el sí o no la respuesta es una sola.) */
+    public function admiteAclaratorias(): bool
+    {
+        return $this === self::TresCartas || $this === self::CruzCelta;
+    }
+
     /** Dónde arranca la máquina de estados de una lectura de este tipo. */
     public function estadoInicial(): EstadoLectura
     {

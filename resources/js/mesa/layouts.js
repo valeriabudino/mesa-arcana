@@ -80,6 +80,21 @@ export function lugarEnTirada(tipo, posicion) {
     return { y: 0, rotY: 0, ...lugares[posicion] };
 }
 
+// Carta aclaratoria: junto a la carta que aclara. En tres cartas va debajo (hay lugar);
+// en la cruz celta las posiciones están pegadas, así que va apoyada en diagonal encima.
+export function lugarAclaratoria(tipo, aclara) {
+    const base = lugarEnTirada(tipo, aclara);
+
+    return tipo === 'cruz_celta'
+        ? { x: base.x + 0.42, z: base.z + 0.5, y: base.y + 0.02, rotY: base.rotY + 0.25 }
+        : { x: base.x, z: base.z + 1.35, y: 0, rotY: 0 };
+}
+
+/** Dónde va una carta elegida: su posición de la tirada, o junto a la que aclara. */
+export function lugarDeCarta(tipo, { posicion, aclara = null }) {
+    return aclara === null || aclara === undefined ? lugarEnTirada(tipo, posicion) : lugarAclaratoria(tipo, aclara);
+}
+
 // Las cuatro esquinas de una carta apoyada en un lugar (para encuadrar la cámara).
 function esquinas({ x, z, y = 0, rotY = 0 }) {
     const c = Math.cos(rotY);
@@ -105,5 +120,7 @@ export function puntosDeEncuadre() {
 
 // Para revelar alcanza con la tirada y el descarte: la cámara se puede acercar.
 export function puntosDeLectura(tipo) {
-    return [...TIRADAS[tipo], DESCARTE].flatMap(esquinas);
+    const aclaratorias = tipo === 'si_no' ? [] : TIRADAS[tipo].map((_, i) => lugarAclaratoria(tipo, i));
+
+    return [...TIRADAS[tipo], ...aclaratorias, DESCARTE].flatMap(esquinas);
 }

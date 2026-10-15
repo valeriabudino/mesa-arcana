@@ -68,14 +68,20 @@ class LecturaCartasService
 
             $elegida = new LecturaCarta(['posicion' => $posicion, 'indice_abanico' => $indiceAbanico]);
             $elegida->lectura_id = $l->id;
-            $elegida->carta_id = $l->orden_mazo[$indiceAbanico];
+            $elegida->carta_id = $l->orden_mazo[$indiceAbanico]; // mismo orden de siempre: no se remezcla
             $elegida->invertida = random_int(0, 1) === 1;
+            if ($l->aclarando !== null) {
+                $elegida->es_aclaratoria = true;
+                $elegida->aclara_posicion = $l->aclarando;
+                $l->aclarando = null;
+            }
             $elegida->save();
 
-            if ($posicion + 1 === $l->tipo->cantidad()) {
+            // Ya no falta ninguna: a revelar. (cartas_esperadas = tirada + aclaratorias aceptadas)
+            if ($posicion + 1 === $l->cartas_esperadas) {
                 $l->pasarA(EstadoLectura::Revelando);
-                $l->save();
             }
+            $l->save();
 
             return [$l, $elegida];
         });
@@ -117,9 +123,28 @@ class LecturaCartasService
 
         $this->emitir(new CartaRevelada($lectura->consulta->uuid, $carta->load('carta')->setRelation('lectura', $lectura)));
         // Sin el nombre: que la sorpresa la dé la carta girando, no el chat.
-        $this->chat->sistema($lectura->consulta, "{$lectura->consulta->tarotista->name} reveló la carta de «{$lectura->tipo->nombrePosicion($posicion)}».");
+        $this->chat->sistema($lectura->consulta, "{$lectura->consulta->tarotista->name} reveló la carta de «{$carta->nombrePosicion()}».");
 
         return $carta;
+    }
+
+    /**
+     * La tarotista aceptó una aclaratoria (Abierta → Eligiendo, una carta más).
+     * Se llama dentro de la transacción de ConsultaService::aceptarPedido.
+     */
+    public function aceptarAclaratoria(Lectura $lectura, int $aclara): Lectura
+    {
+        $l = $this->bloquear($lectura);
+        if ($motivo = $l->motivoParaNoAclarar($aclara)) {
+            throw new AccionFueraDeOrden($motivo);
+        }
+
+        $l->cartas_esperadas++;
+        $l->aclarando = $aclara;
+        $l->pasarA(EstadoLectura::Eligiendo);
+        $l->save();
+
+        return $l;
     }
 
     /**
@@ -133,6 +158,7 @@ class LecturaCartasService
         $lectura->load('cartas');
 
         return $lectura->datosPublicos() + [
+            'aclarando' => $lectura->aclarando,
             'cartas' => $lectura->cartas->map(function (LecturaCarta $elegida) use ($lectura) {
                 if (! $elegida->estaRevelada()) {
                     return ['revelada' => false] + $elegida->datosElegida();

@@ -5,7 +5,7 @@
 
 const $ = (selector) => document.querySelector(selector);
 
-export function crearChat(config, { alEnviar, alResponderPedido, alEscribir }) {
+export function crearChat(config, { alEnviar, alResponderPedido, alEscribir, nombrePosicion }) {
     const soyTarotista = config.yo.rol === 'tarotista';
     const mensajes = new Map(); // id → mensaje (por id: un mensaje repetido no se dibuja dos veces)
     let ultimoId = 0;
@@ -38,9 +38,12 @@ export function crearChat(config, { alEnviar, alResponderPedido, alEscribir }) {
         }`);
         burbuja.append(nodo('p', 'text-[10px] uppercase tracking-wider opacity-60', m.autor?.nombre ?? ''));
 
-        if (m.tipo === 'pedido_servicio') {
+        if (m.tipo === 'pedido_servicio' || m.tipo === 'pedido_aclaratoria') {
             burbuja.classList.add('border', 'border-[#C9A54C]');
-            burbuja.append(nodo('p', 'font-semibold', `✦ Pidió: ${config.tipos[m.servicio]?.nombre ?? m.servicio}`));
+            const que = m.tipo === 'pedido_servicio'
+                ? config.tipos[m.servicio]?.nombre ?? m.servicio
+                : `aclarar «${nombrePosicion(Number(m.ancla?.valor)) ?? 'una carta'}»`;
+            burbuja.append(nodo('p', 'font-semibold', `✦ Pidió: ${que}`));
             if (m.contenido) burbuja.append(nodo('p', 'italic', `«${m.contenido}»`));
 
             if (m.estado_pedido === 'pendiente' && soyTarotista) {

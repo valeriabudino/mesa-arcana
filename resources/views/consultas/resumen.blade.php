@@ -24,7 +24,7 @@
                         <img src="{{ $elegida->carta->urlImagen() }}" alt="{{ $elegida->carta->nombre }}"
                              class="h-28 w-auto rounded {{ $elegida->invertida ? 'rotate-180' : '' }}">
                         <div class="space-y-1">
-                            <p class="text-xs uppercase tracking-widest text-[#C9A54C]">{{ $lectura->tipo->nombrePosicion($elegida->posicion) }}</p>
+                            <p class="text-xs uppercase tracking-widest text-[#C9A54C]">{{ $elegida->setRelation('lectura', $lectura)->nombrePosicion() }}</p>
                             <p class="font-semibold">{{ $elegida->carta->nombre }}</p>
                             <p class="text-xs text-[#C97B8E]">{{ $elegida->invertida ? 'Invertida' : 'Al derecho' }}</p>
                             <p class="text-sm">{{ $elegida->invertida ? $elegida->carta->significado_invertido : $elegida->carta->significado_derecho }}</p>

@@ -46,8 +46,8 @@ it('trae la lectura activa con su tipo, estado y pregunta', function () {
 it('las cartas sin revelar dicen dónde están, pero no qué carta son', function () {
     $respuesta = $this->actingAs($this->consultante)->getJson(route('consultas.estado', $this->consulta))->assertOk();
 
-    expect($respuesta->json('lectura.cartas.0'))->toBe(['revelada' => false, 'posicion' => 0, 'indice_abanico' => 5])  // ni una clave más
-        ->and($respuesta->json('lectura.cartas.2'))->toBe(['revelada' => false, 'posicion' => 2, 'indice_abanico' => 77]);
+    expect($respuesta->json('lectura.cartas.0'))->toBe(['revelada' => false, 'posicion' => 0, 'indice_abanico' => 5, 'aclara' => null])  // ni una clave más
+        ->and($respuesta->json('lectura.cartas.2'))->toBe(['revelada' => false, 'posicion' => 2, 'indice_abanico' => 77, 'aclara' => null]);
 
     $json = $respuesta->getContent();
     foreach ($this->lectura->cartas()->with('carta')->whereNull('revelada_at')->get() as $elegida) {
@@ -63,7 +63,7 @@ it('la carta revelada viaja igual que en los eventos CartaElegida + CartaRevelad
     Event::assertDispatched(CartaRevelada::class, function (CartaRevelada $evento) use ($respuesta) {
         // indice_abanico (de CartaElegida) hace falta para redibujar la mesa al recargar
         // (sin 'lectura': en la foto las cartas ya van adentro de su lectura)
-        expect($respuesta->json('lectura.cartas.1'))->toBe(['revelada' => true, 'posicion' => 1, 'indice_abanico' => 40] + Arr::except($evento->broadcastWith(), 'lectura'));
+        expect($respuesta->json('lectura.cartas.1'))->toBe(['revelada' => true, 'posicion' => 1, 'indice_abanico' => 40, 'aclara' => null] + Arr::except($evento->broadcastWith(), 'lectura'));
 
         return true;
     });

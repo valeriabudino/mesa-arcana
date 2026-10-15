@@ -3,9 +3,11 @@
 // En la Fase 4, mesa.js solo conecta `.listen('.CartaElegida', e => animaciones.elegir(e))`.
 
 import gsap from 'gsap';
-import { DESCARTE, lugarEnAbanico, lugarEnTirada, MAZO, PASO_PILA, PILAS_MEZCLA, puntosDeLectura } from './layouts.js';
+import * as THREE from 'three';
+import { DESCARTE, lugarDeCarta, lugarEnAbanico, MAZO, PASO_PILA, PILAS_MEZCLA, puntosDeLectura } from './layouts.js';
 import { RESALTE } from './mazo.js';
 import { reducirMovimiento } from './escena.js';
+import { crearTextoGrabado } from './texturas.js';
 
 const SUAVE = 'power2.inOut'; // el plan: lento y con peso, nada rebota
 const xyz = ({ x, y, z }) => ({ x, y, z });
@@ -39,6 +41,31 @@ function volar(tl, carta, destino, inicio, { duracion, altura }) {
 export function crearAnimaciones({ escena, mazo, tipoTirada }) {
     const { luces, vista } = escena;
     const lucesIniciales = Object.fromEntries(Object.entries(luces).map(([k, luz]) => [k, luz.intensity]));
+
+    const lugarDe = (carta) => lugarDeCarta(tipoTirada, carta);
+
+    // "SÍ / NO / QUIZÁS" grabado en dorado sobre el paño (solo en el sí o no).
+    let grabado = null;
+    const quitarGrabado = () => {
+        if (!grabado) return;
+        escena.escena.remove(grabado);
+        grabado.material.map.dispose();
+        grabado.material.dispose();
+        grabado.geometry.dispose();
+        grabado = null;
+    };
+    const ponerGrabado = (texto, lugar) => {
+        quitarGrabado();
+        grabado = new THREE.Mesh(
+            new THREE.PlaneGeometry(2.4, 0.9),
+            new THREE.MeshBasicMaterial({ map: crearTextoGrabado(escena.renderer, texto), transparent: true, opacity: 0, depthWrite: false }),
+        );
+        grabado.rotation.x = -Math.PI / 2;
+        grabado.position.set(lugar.x, 0.004, lugar.z + 1.3);
+        escena.escena.add(grabado);
+
+        return grabado.material;
+    };
 
     if (reducirMovimiento()) {
         gsap.globalTimeline.timeScale(40); // casi instantáneo, pero se respeta el orden
@@ -99,19 +126,23 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             return tl.then(() => mazo.cartas.forEach((carta) => (carta.enAbanico = true)));
         },
 
-        /** CartaElegida { posicion, indice_abanico } — sale del abanico y vuela a su lugar, boca abajo. */
-        elegir({ posicion, indice_abanico }) {
+        /**
+         * CartaElegida { posicion, indice_abanico, aclara } — sale del abanico y vuela a su lugar,
+         * boca abajo. Si es una aclaratoria (aclara = posición), va junto a la carta que aclara.
+         */
+        elegir({ posicion, indice_abanico, aclara = null }) {
             const carta = mazo.cartas[indice_abanico];
             if (!carta?.enAbanico) return Promise.resolve(); // evento repetido o fuera de lugar: se ignora
 
             carta.enAbanico = false;
             carta.posicion = posicion;
+            carta.aclara = aclara;
             mazo.porPosicion.set(posicion, carta);
 
             const tl = gsap.timeline();
             tl.to(carta.dorso, { emissiveIntensity: 0, duration: 0.3 }, 0);
             tl.to(carta.acostada.position, { y: 0, z: 0, duration: 0.3 }, 0);
-            volar(tl, carta, lugarEnTirada(tipoTirada, posicion), 0, { duracion: 0.9, altura: 1.1 });
+            volar(tl, carta, lugarDe(carta), 0, { duracion: 0.9, altura: 1.1 });
 
             return tl.then();
         },
@@ -136,10 +167,27 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
         },
 
         /**
+         * AclaratoriaAceptada — las cartas que quedaron vuelven del costado a su MISMO lugar
+         * del abanico (no se remezcla: los huecos muestran las que ya salieron).
+         */
+        reabrirAbanico() {
+            const tl = gsap.timeline();
+            const libres = mazo.cartas.map((carta, i) => [carta, i]).filter(([carta]) => carta.posicion === null);
+            libres.forEach(([carta, i], k) => volar(tl, carta, lugarEnAbanico(i), k * 0.01, { duracion: 0.6, altura: 0.3 }));
+
+            const toda = escena.enfocar(null);
+            tl.to(vista.posicion, { ...xyz(toda.posicion), duration: 1.4, ease: SUAVE }, 0);
+            tl.to(vista.objetivo, { ...xyz(toda.objetivo), duration: 1.4, ease: SUAVE }, 0);
+            tl.to(luces.foco, { intensity: 0, duration: 0.6 }, 0);
+
+            return tl.then(() => libres.forEach(([carta]) => (carta.enAbanico = true)));
+        },
+
+        /**
          * CartaRevelada { posicion, invertida, carta: { imagen, ... } }
          * Recién acá se descarga la imagen del frente; después la carta salta, gira y cae.
          */
-        async revelar({ posicion, invertida, carta: datos }) {
+        async revelar({ posicion, invertida, carta: datos, respuesta = null }) {
             const carta = mazo.porPosicion.get(posicion);
             if (!carta || carta.revelada) return; // evento repetido o fuera de lugar: se ignora
             carta.revelada = true;
@@ -150,7 +198,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                 console.warn('No se pudo cargar el frente de la carta', datos.imagen, error);
             }
 
-            const lugar = lugarEnTirada(tipoTirada, posicion);
+            const lugar = lugarDe(carta);
             const tl = gsap.timeline();
 
             // El foco se mueve hasta la carta y se enciende.
@@ -166,7 +214,33 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
             }
             tl.to(carta.pivote.position, { y: lugar.y, duration: 0.35, ease: 'power2.in' }, 0.75);
 
+            // Sí o no: la respuesta (calculada en el servidor) aparece grabada en el paño.
+            if (respuesta) tl.to(ponerGrabado(respuesta.texto, lugar), { opacity: 1, duration: 1.2, ease: SUAVE }, 1.1);
+
             return tl.then();
+        },
+
+        /**
+         * EstadoCambiado → cerrada: todo vuelve a la pila boca abajo y la cámara a la mesa
+         * completa ("reposo": el mazo y la vela, mientras se conversa).
+         */
+        volverAReposo() {
+            const tl = gsap.timeline();
+            mazo.cartas.forEach((carta, i) => {
+                carta.enAbanico = false;
+                tl.to(carta.volteo.rotation, { y: Math.PI, duration: 0.5, ease: SUAVE }, 0);
+                tl.to(carta.acostada.position, { y: 0, z: 0, duration: 0.2 }, 0);
+                volar(tl, carta, { ...MAZO, y: i * PASO_PILA }, 0.3 + i * 0.006, { duracion: 0.6, altura: 0.35 });
+            });
+            if (grabado) tl.to(grabado.material, { opacity: 0, duration: 0.6 }, 0);
+            tl.to(luces.foco, { intensity: 0, duration: 0.6 }, 0);
+
+            const toda = escena.enfocar(null);
+            tl.to(vista.posicion, { ...xyz(toda.posicion), duration: 1.6, ease: SUAVE }, 0.2);
+            tl.to(vista.objetivo, { ...xyz(toda.objetivo), duration: 1.6, ease: SUAVE }, 0.2);
+
+            // Al terminar, estado limpio (libera las imágenes de los frentes).
+            return tl.then(() => animaciones.reiniciar());
         },
 
         /** Cierre (con ConsultaFinalizada, en la Fase 3): la cámara se aleja y las reveladas quedan brillando. */
@@ -213,8 +287,9 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                 const carta = mazo.cartas[elegida.indice_abanico];
                 carta.enAbanico = false;
                 carta.posicion = elegida.posicion;
+                carta.aclara = elegida.aclara ?? null;
                 mazo.porPosicion.set(elegida.posicion, carta);
-                mazo.colocar(carta, lugarEnTirada(tipoTirada, elegida.posicion));
+                mazo.colocar(carta, lugarDe(carta));
             }
 
             if (estado === 'revelando' || estado === 'abierta') {
@@ -242,6 +317,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
                         }
                         carta.volteo.rotation.y = 0;
                         if (elegida.invertida) carta.pivote.rotation.y += Math.PI;
+                        if (elegida.respuesta) ponerGrabado(elegida.respuesta.texto, lugarDe(carta)).opacity = 1;
                     }),
             );
         },
@@ -254,6 +330,7 @@ export function crearAnimaciones({ escena, mazo, tipoTirada }) {
         /** Vuelve todo al principio sin animar (para el laboratorio y al redibujar desde /estado). */
         reiniciar() {
             gsap.globalTimeline.clear();
+            quitarGrabado();
             mazo.reiniciar();
             for (const [k, luz] of Object.entries(luces)) luz.intensity = lucesIniciales[k];
             escena.reencuadrar();

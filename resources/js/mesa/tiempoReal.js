@@ -7,7 +7,7 @@ import '../echo.js';
 // que no les agregue el namespace App\Events (como en la guía).
 export const EVENTOS = [
     // la consulta y el chat
-    'MensajeEnviado', 'PedidoResuelto', 'LecturaIniciada', 'EstadoCambiado', 'ConsultaFinalizada',
+    'MensajeEnviado', 'PedidoResuelto', 'LecturaIniciada', 'EstadoCambiado', 'AclaratoriaAceptada', 'ConsultaFinalizada',
     // la mesa
     'MazoMezclado', 'CartaElegida', 'CartaRevelada',
 ];

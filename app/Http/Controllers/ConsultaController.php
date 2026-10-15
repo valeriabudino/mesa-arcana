@@ -73,7 +73,7 @@ class ConsultaController extends Controller
             'tarotista' => $consulta->tarotista->name,
             'consultante' => $consulta->consultante->name,
             'tipos' => collect(TipoLectura::cases())->mapWithKeys(fn (TipoLectura $t) => [
-                $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones(), 'disponible' => $t->esDeCartas()],
+                $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones(), 'disponible' => $t->esDeCartas(), 'aclaratorias' => $t->admiteAclaratorias()],
             ]),
             'etiquetas' => collect(EstadoLectura::cases())->mapWithKeys(fn (EstadoLectura $e) => [$e->value => $e->etiqueta()]),
             'rutas' => [

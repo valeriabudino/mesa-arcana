@@ -213,7 +213,7 @@ export function crearEscena(contenedor) {
     return {
         /** Encuadre para ver solo estos puntos. No mueve la cámara: devuelve adónde ir, para animarlo. */
         enfocar(lista) {
-            puntos = aVectores(lista);
+            puntos = lista === null ? todos : aVectores(lista); // null = la mesa completa (con el abanico)
 
             return calcularEncuadre(camara, puntos);
         },

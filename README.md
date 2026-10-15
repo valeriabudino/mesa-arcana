@@ -120,9 +120,11 @@ corré otra vez `./vendor/bin/sail npm run dev`.
 
 ## Problemas comunes
 
-- **"Address already in use" al hacer `sail up`:** algún puerto (80, 3306, 5173 u 8080) ya está
-  ocupado. Cambialo en `.env`, por ejemplo `APP_PORT=8000` (y `APP_URL=http://localhost:8000`),
-  `FORWARD_DB_PORT=3307` o `VITE_PORT=5174`, y volvé a correr `./vendor/bin/sail up -d`.
+- **"Address already in use" al hacer `sail up`:** algún puerto ya está ocupado. Cambialo en
+  `.env` y volvé a correr `./vendor/bin/sail up -d`:
+  - puerto 80 (la app): `APP_PORT=8000` y `APP_URL=http://localhost:8000`;
+  - puerto 3306 (MySQL): `FORWARD_DB_PORT=3307`;
+  - puerto 8080 (Reverb): `REVERB_SERVER_PORT=8081` y `VITE_REVERB_PORT=8081` (el navegador se conecta a ese).
 - **La mesa no se mueve o el chat no llega a la otra persona:** falta Reverb (terminal 2).
 - **"Vite manifest not found" o la página sin estilos:** falta `npm run dev` (terminal 1) o `npm run build`.
 - **La mesa no aparece y dice "Tu navegador no tiene WebGL 2":** activá la aceleración por

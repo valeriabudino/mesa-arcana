@@ -16,7 +16,11 @@
         </form>
     </header>
 
-    <a id="consulta-activa" hidden href="#" class="boton mb-6">Volver a tu consulta en curso</a>
+    {{-- Con una consulta abierta no se puede atender a nadie más: se explica, para que «Atender» apagado no confunda. --}}
+    <div id="aviso-consulta-activa" hidden class="mb-6 space-y-3 rounded-xl border border-[#C9A54C]/50 bg-[#2A1E4A]/60 p-4">
+        <p>Tenés una consulta en curso. Para atender a otra persona, entrá y tocá <strong>Finalizar consulta</strong>.</p>
+        <a id="consulta-activa" href="#" class="boton">Volver a tu consulta en curso</a>
+    </div>
 
     <h2 class="mb-3 text-sm uppercase tracking-widest text-[#F3EBDD]/60">En la fila</h2>
     <ol id="cola" class="space-y-3"></ol>

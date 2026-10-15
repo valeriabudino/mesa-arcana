@@ -58,7 +58,9 @@ function tarjeta(turno) {
         boton.className = 'boton';
         boton.textContent = 'Atender';
         boton.disabled = ocupada || !$('#disponible').checked || Boolean(config.consulta_activa);
-        boton.title = !$('#disponible').checked ? 'Activá «Disponible» para atender' : '';
+        boton.title = config.consulta_activa
+            ? 'Terminá tu consulta en curso para atender a otra persona'
+            : !$('#disponible').checked ? 'Activá «Disponible» para atender' : '';
         boton.addEventListener('click', () => atender(turno.uuid));
         li.append(boton);
     }
@@ -69,7 +71,7 @@ function tarjeta(turno) {
 function dibujar() {
     $('#cola').replaceChildren(...[...turnos.values()].map(tarjeta));
     $('#cola-vacia').hidden = turnos.size > 0;
-    $('#consulta-activa').hidden = !config.consulta_activa;
+    $('#aviso-consulta-activa').hidden = !config.consulta_activa;
     if (config.consulta_activa) $('#consulta-activa').href = config.consulta_activa;
 }
 

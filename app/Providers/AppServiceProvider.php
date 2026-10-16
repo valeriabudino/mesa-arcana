@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Interpretacion\Interpretador;
+use App\Interpretacion\InterpretadorBase;
+use App\Interpretacion\InterpretadorIA;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +18,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // La interpretación (plan v3 §13.6): con la IA si está configurada y hay clave; si no, la base.
+        $this->app->bind(Interpretador::class, function () {
+            $proveedor = config('interpretacion.proveedor');
+            $conClave = filled(config("prism.providers.{$proveedor}.api_key"));
+
+            return config('interpretacion.interpretador') === 'ia' && $conClave
+                ? new InterpretadorIA($proveedor, config('interpretacion.modelo'), config('interpretacion.timeout'), config('interpretacion.intervalo_ms'))
+                : new InterpretadorBase;
+        });
     }
 
     /**

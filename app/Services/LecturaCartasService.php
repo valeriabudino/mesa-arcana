@@ -8,6 +8,7 @@ use App\Events\CartaElegida;
 use App\Events\CartaRevelada;
 use App\Events\MazoMezclado;
 use App\Exceptions\AccionFueraDeOrden;
+use App\Jobs\GenerarInterpretacion;
 use App\Models\Carta;
 use App\Models\Lectura;
 use App\Models\LecturaCarta;
@@ -125,6 +126,11 @@ class LecturaCartasService
         // La carta entra al chat con su significado. El navegador la muestra recién cuando
         // termina de girar en la mesa (mesa.js la encola detrás de la animación).
         $this->chat->carta($carta);
+
+        // Con todas las cartas a la vista, se escribe la interpretación (en la cola).
+        if ($lectura->estado === EstadoLectura::Abierta && $lectura->tipo->esDeCartas()) {
+            GenerarInterpretacion::dispatch($lectura->id);
+        }
 
         return $carta;
     }

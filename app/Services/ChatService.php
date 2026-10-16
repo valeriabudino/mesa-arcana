@@ -7,6 +7,7 @@ use App\Enums\EstadoPedido;
 use App\Enums\TipoAncla;
 use App\Enums\TipoLectura;
 use App\Enums\TipoMensaje;
+use App\Events\InterpretacionPublicada;
 use App\Events\MensajeEnviado;
 use App\Events\PedidoResuelto;
 use App\Exceptions\AccionFueraDeOrden;
@@ -48,6 +49,16 @@ class ChatService
         $texto = "{$carta->nombrePosicion()}: {$carta->carta->nombre}".($carta->invertida ? ' (invertida)' : '');
 
         return $this->crear($carta->lectura->consulta, TipoMensaje::Carta, $texto, lectura: $carta->lectura, posicion: $carta->posicion);
+    }
+
+    /** La interpretación que publica la tarotista. Viaja como InterpretacionPublicada (plan v3 §13.7). */
+    public function interpretacion(Lectura $lectura, string $texto): Mensaje
+    {
+        $consulta = $lectura->consulta;
+        $mensaje = $this->crear($consulta, TipoMensaje::Interpretacion, $texto, $consulta->tarotista, lectura: $lectura, avisar: false);
+        $this->emitir(new InterpretacionPublicada($consulta->uuid, $mensaje));
+
+        return $mensaje;
     }
 
     /** La carta astral calculada, como mensaje. */
@@ -185,6 +196,7 @@ class ChatService
         ?User $autora = null,
         ?Lectura $lectura = null,
         ?int $posicion = null,
+        bool $avisar = true,
     ): Mensaje {
         $mensaje = new Mensaje(['contenido' => $contenido]);
         $mensaje->consulta_id = $consulta->id;
@@ -200,7 +212,10 @@ class ChatService
             $mensaje->setRelation('lectura', $lectura->load('cartas.carta'));
         }
 
-        $this->emitir(new MensajeEnviado($consulta->uuid, $mensaje->setRelation('autora', $autora)));
+        $mensaje->setRelation('autora', $autora);
+        if ($avisar) {
+            $this->emitir(new MensajeEnviado($consulta->uuid, $mensaje));
+        }
 
         return $mensaje;
     }

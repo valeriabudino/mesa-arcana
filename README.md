@@ -44,7 +44,7 @@ docker run --rm -u "$(id -u):$(id -g)" -v "$(pwd):/var/www/html" -w /var/www/htm
 ./vendor/bin/sail npm install
 ```
 
-Después, en **dos terminales** que quedan abiertas:
+Después, en **tres terminales** que quedan abiertas:
 
 ```bash
 # Terminal 1: Vite (compila el frontend y recarga al guardar)
@@ -52,6 +52,9 @@ Después, en **dos terminales** que quedan abiertas:
 
 # Terminal 2: Reverb (el tiempo real: la mesa, el chat, la fila de espera)
 ./vendor/bin/sail artisan reverb:start --host=0.0.0.0 --port=8080
+
+# Terminal 3: la cola (escribe la interpretación de cada lectura)
+./vendor/bin/sail artisan queue:work
 ```
 
 Opcional, en una tercera terminal: el scheduler, que revela el **oráculo del día** a las 9
@@ -84,6 +87,13 @@ Para crear otra cuenta de tarotista:
 ```bash
 ./vendor/bin/sail artisan tarotista:crear
 ```
+
+**Interpretación con IA:** cuando se revelan todas las cartas, a la tarotista (solo a ella) le
+llega un borrador que se va escribiendo en vivo; lo edita y lo publica en el chat. Para que lo
+escriba la IA, poné una clave gratis de [Groq](https://console.groq.com/keys) en `.env`
+(`GROQ_API_KEY=…`) y reiniciá la cola (Ctrl+C y otra vez `queue:work`, que lee la
+configuración al arrancar). Sin clave, o si Groq falla o tarda más de 20 segundos, el borrador
+se arma con los significados de las cartas.
 
 **Oráculo del día:** en el inicio, sin login. Para la demo se puede revelar (o sortear otra
 carta) a mano, y se ve girar en vivo en todas las pantallas que tengan el inicio abierto:
@@ -142,6 +152,7 @@ corré otra vez `./vendor/bin/sail npm run dev`.
   - puerto 3306 (MySQL): `FORWARD_DB_PORT=3307`;
   - puerto 8080 (Reverb): `REVERB_SERVER_PORT=8081` y `VITE_REVERB_PORT=8081` (el navegador se conecta a ese).
 - **La mesa no se mueve o el chat no llega a la otra persona:** falta Reverb (terminal 2).
+- **No aparece el borrador de la interpretación:** falta la cola (terminal 3).
 - **"Vite manifest not found" o la página sin estilos:** falta `npm run dev` (terminal 1) o `npm run build`.
 - **La mesa no aparece y dice "Tu navegador no tiene WebGL 2":** activá la aceleración por
   hardware del navegador o probá con otro.

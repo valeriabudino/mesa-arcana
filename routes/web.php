@@ -80,6 +80,7 @@ Route::middleware('auth')->prefix('c/{consulta}')->name('consultas.')->scopeBind
         Route::post('elegir', [LecturaController::class, 'elegir'])->name('elegir')->can('elegir', 'lectura');
         Route::post('revelar', [LecturaController::class, 'revelar'])->name('revelar')->can('revelar', 'lectura');
         Route::post('cerrar', [LecturaController::class, 'cerrar'])->name('cerrar')->can('cerrar', 'lectura');
+        Route::post('interpretacion', [LecturaController::class, 'publicarInterpretacion'])->name('interpretacion')->can('revelar', 'lectura');
         Route::post('aclaratoria', [LecturaController::class, 'pedirAclaratoria'])->name('aclaratoria')->can('pedirAclaratoria', 'lectura');
         Route::post('nacimiento', [CartaAstralController::class, 'nacimiento'])->name('nacimiento')->can('enviarNacimiento', 'lectura')
             ->middleware('throttle:10,1'); // cada envío corre un proceso de node

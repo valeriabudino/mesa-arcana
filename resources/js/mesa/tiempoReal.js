@@ -12,6 +12,8 @@ export const EVENTOS = [
     'MazoMezclado', 'CartaElegida', 'CartaRevelada',
     // el cielo (carta astral)
     'DatosNacimientoRecibidos', 'CartaAstralCalculada', 'PlanetaSenalado',
+    // la interpretación publicada (el borrador va por el canal privado de la tarotista)
+    'InterpretacionPublicada',
 ];
 
 export function conectar(uuid, manejadores) {

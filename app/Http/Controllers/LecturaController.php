@@ -7,6 +7,7 @@ use App\Models\Consulta;
 use App\Models\Lectura;
 use App\Services\ChatService;
 use App\Services\ConsultaService;
+use App\Services\InterpretacionService;
 use App\Services\LecturaCartasService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -68,6 +69,16 @@ class LecturaController extends Controller
         $datos = $request->validate(['posicion' => ['required', 'integer', 'min:0']]);
 
         $this->chat->pedirAclaratoria($lectura, $request->user(), $datos['posicion']);
+
+        return response()->noContent();
+    }
+
+    /** La tarotista publica la interpretación (el borrador de la IA, editado o no). */
+    public function publicarInterpretacion(Request $request, Consulta $consulta, Lectura $lectura, InterpretacionService $interpretaciones): Response
+    {
+        $datos = $request->validate(['texto' => ['required', 'string', 'max:4000']]);
+
+        $interpretaciones->publicar($lectura, trim($datos['texto']));
 
         return response()->noContent();
     }

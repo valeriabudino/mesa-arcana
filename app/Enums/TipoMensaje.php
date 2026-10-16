@@ -10,4 +10,5 @@ enum TipoMensaje: string
     case PedidoAclaratoria = 'pedido_aclaratoria';
     case Carta = 'carta'; // una carta revelada, con su significado (la lectura vive en el chat)
     case CartaAstral = 'carta_astral'; // la tríada calculada, con su interpretación
+    case Interpretacion = 'interpretacion'; // la que publica la tarotista (escrita por la IA y editada)
 }

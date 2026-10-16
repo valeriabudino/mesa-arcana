@@ -22,6 +22,9 @@ use Illuminate\Support\Carbon;
  * @property TipoLectura $tipo
  * @property EstadoLectura $estado
  * @property int|null $pregunta_id
+ * @property string|null $interpretacion_borrador (privado: solo para la tarotista)
+ * @property string|null $interpretacion_fuente ia | base
+ * @property Carbon|null $interpretacion_publicada_at
  * @property-read Pregunta|null $pregunta
  * @property int $cartas_esperadas (las de la tirada + 1 por cada aclaratoria aceptada)
  * @property int|null $aclarando (posición que se está aclarando mientras se elige)
@@ -33,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $cerrada_at
  */
 #[Fillable(['tipo', 'pregunta_id'])] // estado, orden_mazo y resultado los manejan solo los servicios
-#[Hidden(['orden_mazo'])] // NUNCA se serializa: ni en eventos ni en vistas
+#[Hidden(['orden_mazo', 'interpretacion_borrador'])] // NUNCA se serializa: ni en eventos ni en vistas
 class Lectura extends Model
 {
     /** @use HasFactory<LecturaFactory> */

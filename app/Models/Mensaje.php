@@ -107,6 +107,10 @@ class Mensaje extends Model
             return ['lectura' => $this->lectura_id, 'revelada' => $carta->setRelation('lectura', $this->lectura)->datosRevelada()];
         }
 
+        if ($this->tipo === TipoMensaje::Interpretacion) {
+            return ['lectura' => $this->lectura_id];
+        }
+
         if ($this->tipo === TipoMensaje::CartaAstral) {
             return ['lectura' => $this->lectura_id, 'resultado' => $this->lectura->resultado];
         }

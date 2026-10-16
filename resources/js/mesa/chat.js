@@ -94,6 +94,17 @@ export function crearChat(config, { alEnviar, alResponderPedido, alEscribir, nom
 
             return li;
         }
+        if (m.tipo === 'interpretacion') {
+            li.className = 'flex justify-center';
+            const caja = tarjeta('space-y-1');
+            caja.append(
+                titulo(`✨ Interpretación de ${m.autor?.nombre ?? 'la tarotista'}`),
+                nodo('p', 'whitespace-pre-wrap break-words', m.contenido),
+            );
+            li.append(caja);
+
+            return li;
+        }
         if (m.tipo === 'carta' || m.tipo === 'carta_astral') {
             li.className = 'flex justify-center';
             m.tipo === 'carta' ? dibujarCarta(li, m.revelada) : dibujarAstral(li, m);

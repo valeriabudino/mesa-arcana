@@ -5,6 +5,7 @@
 // después, por Reverb, en los dos navegadores a la vez (también los mensajes del chat).
 
 import { crearAnimaciones } from './animaciones.js';
+import { crearBorrador } from './borrador.js';
 import { enviar, pedirEstado } from './api.js';
 import { crearChat } from './chat.js';
 import { crearCola } from './cola.js';
@@ -93,6 +94,17 @@ const chat = crearChat(config, {
     nacimientoDe: (lectura) => (mesa.lectura?.id === lectura ? mesa.lectura.nacimiento ?? null : null),
 });
 
+// El borrador de la interpretación (solo existe en la pantalla de la tarotista).
+const borrador = crearBorrador({
+    alPublicar: (lectura, texto) => accion(`${config.rutas.lecturas}/${lectura}/interpretacion`, { texto }),
+    alMostrar: () => chat.plegar(false), // en el celu, el chat se abre para que lo vea
+});
+if (soyTarotista) {
+    window.Echo.private(`App.Models.User.${config.yo.id}`).listen('.BorradorInterpretacion', (datos) => {
+        if (datos.consulta === config.uuid) borrador.mostrar(datos);
+    });
+}
+
 function refrescar() {
     hud.mostrar({
         estadoConsulta: mesa.estadoConsulta,
@@ -133,6 +145,7 @@ async function cargarEstado() {
     mesa.cartas = new Map(cartas.map((c) => [c.posicion, c]));
 
     chat.habilitar(mesa.estadoConsulta === 'activa');
+    if (foto.borrador) borrador.mostrar(foto.borrador);
     refrescar();
 
     if (lectura.tipo === 'carta_astral') {
@@ -164,6 +177,7 @@ const alEventoDeLaMesa = {
         if (mesa.lectura?.id === lectura.id) return;
         mesa.lectura = lectura;
         mesa.cartas = new Map();
+        borrador.ocultar(); // el de la lectura anterior ya no se publica
         animaciones.reiniciar();
         if (lectura.tipo !== 'carta_astral') animaciones.usarTirada(lectura.tipo);
         refrescar();
@@ -264,6 +278,11 @@ const alEventoDelChat = {
         };
         if (mensaje.tipo === 'carta' || mensaje.tipo === 'carta_astral') encolar(mostrar);
         else mostrar();
+    },
+    InterpretacionPublicada(mensaje) {
+        if (borrador.de() === mensaje.lectura) borrador.ocultar();
+        chat.agregar(mensaje);
+        refrescar();
     },
     PedidoResuelto(datos) {
         chat.resolverPedido(datos);

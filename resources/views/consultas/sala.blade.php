@@ -48,7 +48,7 @@
     {{-- El chat: la conversación y también la lectura (cada carta revelada y la carta astral
          llegan como mensajes). En pantallas anchas, a la derecha. En el celu, abajo y plegado:
          se abre tocando la barra. --}}
-    <aside id="panel" data-plegado="true" class="relative mx-3 flex h-[45dvh] shrink-0 flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur data-[plegado=true]:h-auto md:absolute md:inset-x-auto md:bottom-24 md:right-3 md:top-16 md:mx-0 md:w-80 md:data-[plegado=true]:h-auto">
+    <aside id="panel" data-plegado="true" class="relative mx-3 flex h-[45dvh] shrink-0 flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur data-[plegado=true]:h-auto md:absolute md:inset-x-auto md:bottom-24 md:right-3 md:top-16 md:mx-0 md:h-auto md:w-80 md:data-[plegado=false]:h-auto">
         <button id="plegar" type="button" aria-controls="chat-cuerpo" aria-expanded="false" class="flex items-center gap-2 border-b border-[#C9A54C]/30 px-4 py-2.5 text-left md:pointer-events-none">
             <span class="font-semibold text-[#C9A54C]">Chat y lectura</span>
             <span id="no-leidos" hidden class="rounded-full bg-[#C97B8E] px-1.5 text-xs text-[#0E0B1A]"></span>
@@ -58,6 +58,19 @@
         <div id="chat-cuerpo" class="flex min-h-0 flex-1 flex-col">
             <ol id="chat-lista" class="flex-1 space-y-2 overflow-auto p-3" aria-live="polite"></ol>
             <p id="escribiendo" class="h-5 px-3 text-xs italic text-[#F3EBDD]/50"></p>
+            @if ($consulta->esTarotista(auth()->user()))
+                {{-- El borrador de la interpretación (plan v3 §13.6): llega por el canal privado de la
+                     tarotista mientras la IA escribe; lo edita y lo publica en el chat. --}}
+                <section id="borrador" hidden class="space-y-2 border-t border-[#C9A54C]/30 p-3">
+                    <p class="text-xs uppercase tracking-widest text-[#C9A54C]">✨ Interpretación <span class="normal-case tracking-normal text-[#F3EBDD]/50">· borrador, solo lo ves vos</span></p>
+                    <textarea id="borrador-texto" rows="6" maxlength="4000" readonly
+                              class="w-full resize-y rounded-md border border-[#C9A54C]/40 bg-[#2A1E4A] px-2 py-1.5 text-sm read-only:opacity-80"></textarea>
+                    <div class="flex items-center gap-2">
+                        <span id="borrador-estado" class="text-xs text-[#F3EBDD]/50"></span>
+                        <button id="borrador-publicar" type="button" class="boton ml-auto !px-3 !py-1.5" disabled>Publicar</button>
+                    </div>
+                </section>
+            @endif
             <form id="chat-form" class="flex gap-2 border-t border-[#C9A54C]/30 p-2">
                 <input id="chat-texto" maxlength="1000" autocomplete="off" placeholder="Escribí un mensaje…"
                        class="min-w-0 flex-1 rounded-md border border-[#C9A54C]/40 bg-[#2A1E4A] px-2 py-1.5">

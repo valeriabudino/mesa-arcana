@@ -58,9 +58,17 @@ class ConsultaController extends Controller
     }
 
     /** Foto de la consulta en JSON: para dibujar al entrar y para redibujar al reconectar. */
-    public function estado(Consulta $consulta): JsonResponse
+    public function estado(Request $request, Consulta $consulta): JsonResponse
     {
-        return response()->json($this->consultas->estado($consulta));
+        $estado = $this->consultas->estado($consulta);
+
+        // El borrador de la interpretación es privado: solo lo recibe la tarotista (al recargar).
+        $lectura = $consulta->lecturaActiva;
+        if ($consulta->esTarotista($request->user()) && $lectura?->interpretacion_borrador && ! $lectura->interpretacion_publicada_at) {
+            $estado['borrador'] = ['lectura' => $lectura->id, 'texto' => $lectura->interpretacion_borrador, 'terminado' => true, 'fuente' => $lectura->interpretacion_fuente];
+        }
+
+        return response()->json($estado);
     }
 
     /**

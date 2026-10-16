@@ -54,6 +54,13 @@ Después, en **dos terminales** que quedan abiertas:
 ./vendor/bin/sail artisan reverb:start --host=0.0.0.0 --port=8080
 ```
 
+Opcional, en una tercera terminal: el scheduler, que revela el **oráculo del día** a las 9
+(hora argentina). Si no está corriendo, el inicio lo revela igual en la primera visita después de las 9.
+
+```bash
+./vendor/bin/sail artisan schedule:work
+```
+
 Listo: abrí **http://localhost**.
 
 > **Tip:** para no escribir `./vendor/bin/sail` cada vez, agregá
@@ -76,6 +83,14 @@ Para crear otra cuenta de tarotista:
 
 ```bash
 ./vendor/bin/sail artisan tarotista:crear
+```
+
+**Oráculo del día:** en el inicio, sin login. Para la demo se puede revelar (o sortear otra
+carta) a mano, y se ve girar en vivo en todas las pantallas que tengan el inicio abierto:
+
+```bash
+./vendor/bin/sail artisan oraculo:revelar          # la de hoy, si todavía no salió
+./vendor/bin/sail artisan oraculo:revelar --otra   # sortear otra
 ```
 
 **Música y sonidos:** los navegadores no dejan sonar nada hasta el primer clic en la página.

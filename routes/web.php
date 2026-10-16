@@ -6,12 +6,13 @@ use App\Http\Controllers\CartaAstralController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ConsultaController;
 use App\Http\Controllers\EsperaController;
+use App\Http\Controllers\InicioController;
 use App\Http\Controllers\LecturaController;
 use App\Models\Carta;
 use App\Models\Turno;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::get('/', InicioController::class)->name('home');
 
 // Fase 3: laboratorio de la escena 3D (animaciones con botones, sin sockets). Solo en local.
 if (app()->isLocal()) {

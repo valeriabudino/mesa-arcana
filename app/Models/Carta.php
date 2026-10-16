@@ -38,8 +38,13 @@ class Carta extends Model
         ];
     }
 
+    /**
+     * Ruta relativa a la raíz del sitio ("/cartas/…"), no una URL absoluta: los eventos que
+     * salen de un comando (el oráculo) no tienen request, y asset() usaría APP_URL
+     * (http://localhost), que no carga desde el túnel ni desde otra máquina.
+     */
     public function urlImagen(): string
     {
-        return asset($this->imagen);
+        return '/'.ltrim($this->imagen, '/');
     }
 }

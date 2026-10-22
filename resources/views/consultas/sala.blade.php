@@ -48,7 +48,7 @@
     {{-- El chat: la conversación y también la lectura (cada carta revelada y la carta astral
          llegan como mensajes). En pantallas anchas, a la derecha. En el celu, abajo y plegado:
          se abre tocando la barra. --}}
-    <aside id="panel" data-plegado="true" class="relative mx-3 flex h-[45dvh] shrink-0 flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur data-[plegado=true]:h-auto md:absolute md:inset-x-auto md:bottom-24 md:right-3 md:top-16 md:mx-0 md:h-auto md:w-80 md:data-[plegado=false]:h-auto">
+    <aside id="panel" data-plegado="true" class="relative mx-3 flex h-[45dvh] shrink-0 flex-col overflow-hidden rounded-xl border border-[#C9A54C]/30 bg-[#0E0B1A]/90 text-sm backdrop-blur data-[plegado=true]:h-auto md:absolute md:inset-x-auto md:bottom-3 md:right-3 md:top-16 md:mx-0 md:h-auto md:w-80 md:data-[plegado=false]:h-auto">
         <button id="plegar" type="button" aria-controls="chat-cuerpo" aria-expanded="false" class="flex items-center gap-2 border-b border-[#C9A54C]/30 px-4 py-2.5 text-left md:pointer-events-none">
             <span class="font-semibold text-[#C9A54C]">Chat y lectura</span>
             <span id="no-leidos" hidden class="rounded-full bg-[#C97B8E] px-1.5 text-xs text-[#0E0B1A]"></span>
@@ -80,7 +80,7 @@
     </aside>
 
     {{-- Barra de acción: cambia según rol × estado --}}
-    <footer id="acciones" class="relative flex shrink-0 flex-wrap items-center justify-center gap-3 bg-gradient-to-t from-[#0E0B1A] to-transparent p-3 text-sm md:absolute md:inset-x-0 md:bottom-0 md:p-4"></footer>
+    <footer id="acciones" class="relative flex shrink-0 flex-wrap items-center justify-center gap-3 bg-gradient-to-t from-[#0E0B1A] to-transparent p-3 text-sm md:absolute md:inset-x-0 md:bottom-0 md:right-[21rem] md:p-4"></footer>
 
     <div id="aviso" hidden role="alert" class="absolute bottom-20 left-1/2 -translate-x-1/2 rounded-lg border border-[#C97B8E] bg-[#0E0B1A] px-4 py-2 text-sm"></div>
 

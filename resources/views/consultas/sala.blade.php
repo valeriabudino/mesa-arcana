@@ -30,6 +30,7 @@
         <span id="tipo-lectura" class="ml-auto text-[#F3EBDD]/60"></span>
         {{-- El estado y los botones de sonido van juntos: si no entran, bajan juntos de renglón. --}}
         <span class="flex items-center gap-3">
+            <span id="saldo" class="text-[#C9A54C]"></span>
             <strong id="estado" class="rounded-full border border-[#C97B8E]/50 px-3 py-1 text-[#C97B8E]">Conectando…</strong>
             <span data-sonido></span>
         </span>

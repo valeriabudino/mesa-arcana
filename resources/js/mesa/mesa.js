@@ -99,11 +99,17 @@ const borrador = crearBorrador({
     alPublicar: (lectura, texto) => accion(`${config.rutas.lecturas}/${lectura}/interpretacion`, { texto }),
     alMostrar: () => chat.plegar(false), // en el celu, el chat se abre para que lo vea
 });
+const privado = window.Echo.private(`App.Models.User.${config.yo.id}`);
 if (soyTarotista) {
-    window.Echo.private(`App.Models.User.${config.yo.id}`).listen('.BorradorInterpretacion', (datos) => {
+    privado.listen('.BorradorInterpretacion', (datos) => {
         if (datos.consulta === config.uuid) borrador.mostrar(datos);
     });
 }
+// La billetera (plan v3 §13.2): el saldo cambia al reservar, cobrar o liberar.
+privado.listen('.SaldoActualizado', (saldo) => {
+    hud.mostrarSaldo(saldo);
+    refrescar();
+});
 
 function refrescar() {
     hud.mostrar({
@@ -146,6 +152,7 @@ async function cargarEstado() {
 
     chat.habilitar(mesa.estadoConsulta === 'activa');
     if (foto.borrador) borrador.mostrar(foto.borrador);
+    if (foto.saldo) hud.mostrarSaldo(foto.saldo); // por si se perdió un SaldoActualizado mientras no estaba
     refrescar();
 
     if (lectura.tipo === 'carta_astral') {

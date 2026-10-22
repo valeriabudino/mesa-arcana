@@ -28,6 +28,8 @@ class ChatService
 {
     use EmiteEventos;
 
+    public function __construct(private BilleteraService $billetera) {}
+
     /** Un mensaje de una de las dos. */
     public function enviar(Consulta $consulta, User $autora, string $contenido): Mensaje
     {
@@ -87,6 +89,10 @@ class ChatService
             }
             if ($c->mensajes()->where('estado_pedido', EstadoPedido::Pendiente)->exists()) {
                 throw new AccionFueraDeOrden('Ya hay un pedido esperando respuesta.');
+            }
+            // Se controla al pedir, pero se reserva recién cuando la tarotista acepta.
+            if ($motivo = $this->billetera->motivoParaNoPedir($consultante, $servicio)) {
+                throw new AccionFueraDeOrden($motivo);
             }
 
             // El texto de la pregunta queda también en el contenido (lo usa el resumen).

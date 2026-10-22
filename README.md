@@ -95,6 +95,12 @@ escriba la IA, poné una clave gratis de [Groq](https://console.groq.com/keys) e
 configuración al arrancar). Sin clave, o si Groq falla o tarda más de 20 segundos, el borrador
 se arma con los significados de las cartas.
 
+**Créditos (ficticios por ahora):** cada persona que entra a consultar recibe 100 créditos de
+regalo. Cada servicio tiene su precio (`config/creditos.php`): al aceptar el pedido se reservan,
+al cerrar la lectura se cobran (a la tarotista le llega el precio menos un 20 % de comisión) y, si
+la consulta termina con la lectura a medias, se devuelven. Las aclaratorias no se cobran. El
+regalo y la comisión se cambian con `CREDITOS_REGALO` y `CREDITOS_COMISION` en `.env`.
+
 **Oráculo del día:** en el inicio, sin login. Para la demo se puede revelar (o sortear otra
 carta) a mano, y se ve girar en vivo en todas las pantallas que tengan el inicio abierto:
 

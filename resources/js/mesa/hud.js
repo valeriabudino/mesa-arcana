@@ -37,6 +37,15 @@ export function crearHud(config, acciones) {
     const soyTarotista = config.yo.rol === 'tarotista';
     const miembros = new Map(); // id → { id, name, rol }, lo que devuelve routes/channels.php
     let temporizadorAviso;
+    let saldo = config.saldo; // { disponible, reservado }: llega con la sala y después por SaldoActualizado
+
+    // El saldo arriba: quien consulta ve lo que le queda (y lo apartado); la tarotista, lo que ganó.
+    function pintarSaldo() {
+        const reservado = saldo.reservado ? ` · ${saldo.reservado} reservados` : '';
+        $('#saldo').textContent = soyTarotista ? `✦ ${saldo.disponible} créditos ganados` : `✦ ${saldo.disponible} créditos${reservado}`;
+    }
+    pintarSaldo();
+    const alcanza = (servicio) => config.precios[servicio] <= saldo.disponible;
 
     const pintarPresencia = () => {
         const roles = new Set([...miembros.values()].map((m) => m.rol));
@@ -57,7 +66,16 @@ export function crearHud(config, acciones) {
     function formularioPedir(etiqueta, lectura = null, aclarables = []) {
         const campo = (tipo, clase) => Object.assign(document.createElement(tipo), { className: clase });
         const que = campo('select', 'campo-chico max-w-full');
-        const nuevas = Object.entries(config.tipos).map(([valor, { nombre }]) => new Option(nombre, `nueva:${valor}`));
+        // Cada servicio con su precio; los que no alcanzan se ven pero no se pueden elegir.
+        const nuevas = Object.entries(config.tipos).map(([valor, { nombre }]) => {
+            const opcion = new Option(`${nombre} · ${config.precios[valor]} créditos`, `nueva:${valor}`);
+            opcion.disabled = !alcanza(valor);
+
+            return opcion;
+        });
+        if (!aclarables.length && nuevas.every((o) => o.disabled)) {
+            return [texto(`No te alcanzan los créditos para otra lectura (tenés ${saldo.disponible}).`)];
+        }
         if (aclarables.length) {
             const aclarar = Object.assign(document.createElement('optgroup'), { label: 'Aclarar una carta' });
             for (const c of aclarables) aclarar.append(new Option(`Aclarar «${config.tipos[lectura.tipo].posiciones[c.posicion]}»`, `aclarar:${c.posicion}`));
@@ -67,6 +85,7 @@ export function crearHud(config, acciones) {
         } else {
             que.append(...nuevas);
         }
+        que.value = [...que.options].find((o) => !o.disabled).value;
 
         const temas = campo('div', 'flex basis-full flex-wrap justify-center gap-1.5');
         const pregunta = campo('select', 'campo-chico w-72 max-w-full');
@@ -267,6 +286,12 @@ export function crearHud(config, acciones) {
         conexion(estado) {
             $('#conexion').hidden = estado === 'connected';
             $('#conexion').textContent = estado === 'connecting' || estado === 'initialized' ? 'Conectando…' : 'Reconectando…';
+        },
+
+        /** SaldoActualizado: cambia el número de arriba (y, al redibujar, qué servicios alcanzan). */
+        mostrarSaldo(nuevo) {
+            saldo = nuevo;
+            pintarSaldo();
         },
 
         aviso(mensaje) {

@@ -8,6 +8,7 @@ use App\Models\Ciudad;
 use App\Models\Consulta;
 use App\Models\Tema;
 use App\Models\User;
+use App\Services\BilleteraService;
 use App\Services\CartaAstralService;
 use App\Services\ConsultaService;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +18,10 @@ use Illuminate\View\View;
 
 class ConsultaController extends Controller
 {
-    public function __construct(private ConsultaService $consultas) {}
+    public function __construct(
+        private ConsultaService $consultas,
+        private BilleteraService $billetera,
+    ) {}
 
     /** La sala privada. */
     public function show(Request $request, Consulta $consulta): View
@@ -61,6 +65,7 @@ class ConsultaController extends Controller
     public function estado(Request $request, Consulta $consulta): JsonResponse
     {
         $estado = $this->consultas->estado($consulta);
+        $estado['saldo'] = $this->billetera->saldo($request->user()); // el propio: cada una ve solo el suyo
 
         // El borrador de la interpretación es privado: solo lo recibe la tarotista (al recargar).
         $lectura = $consulta->lecturaActiva;
@@ -84,6 +89,10 @@ class ConsultaController extends Controller
             'minutos_ausente' => ConsultaService::MINUTOS_PARA_AUSENTE,
             'tarotista' => $consulta->tarotista->name,
             'consultante' => $consulta->consultante->name,
+            // La billetera (plan v3 §13.2): el saldo propio y lo que cuesta cada servicio.
+            // Después se actualiza sola con SaldoActualizado, por el canal privado.
+            'saldo' => $this->billetera->saldo($yo),
+            'precios' => $this->billetera->precios(),
             'tipos' => collect(TipoLectura::cases())->mapWithKeys(fn (TipoLectura $t) => [
                 $t->value => ['nombre' => $t->nombre(), 'posiciones' => $t->posiciones(), 'aclaratorias' => $t->admiteAclaratorias()],
             ]),

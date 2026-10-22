@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\Rol;
 use App\Models\User;
+use App\Services\BilleteraService;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,6 +34,16 @@ class UserFactory extends Factory
             'rol' => Rol::Consultante,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /** Como en la app: cada consultante nace con su regalo de créditos (y su movimiento). */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user) {
+            if ($user->esConsultante()) {
+                app(BilleteraService::class)->regalar($user);
+            }
+        });
     }
 
     public function tarotista(): static

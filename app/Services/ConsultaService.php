@@ -36,6 +36,7 @@ class ConsultaService
     public function __construct(
         private LecturaCartasService $cartas,
         private ChatService $chat,
+        private BilleteraService $billetera,
     ) {}
 
     /**
@@ -48,7 +49,7 @@ class ConsultaService
             return $this->aceptarAclaratoria($pedido);
         }
 
-        [$consulta, $lectura, $anterior] = DB::transaction(function () use ($pedido) {
+        [$consulta, $lectura, $anterior, $cobrado, $reservado] = DB::transaction(function () use ($pedido) {
             [$c, $p] = $this->bloquearConPedido($pedido);
 
             // Si la consultante la pidió con la lectura anterior ya terminada, esa se cierra sola.
@@ -56,10 +57,12 @@ class ConsultaService
             if ($anterior && ! $anterior->terminada()) {
                 throw new AccionFueraDeOrden('Ya hay una lectura en curso: cerrala antes de empezar otra.');
             }
+            $cobrado = null;
             if ($anterior) {
                 $anterior->pasarA(EstadoLectura::Cerrada);
                 $anterior->cerrada_at = now();
                 $anterior->save();
+                $cobrado = $this->billetera->cobrar($anterior);
             }
 
             $p->estado_pedido = EstadoPedido::Aceptado;
@@ -68,17 +71,22 @@ class ConsultaService
             $lectura = new Lectura(['tipo' => $p->servicio, 'pregunta_id' => $p->pregunta_id]);
             $lectura->consulta_id = $c->id;
             $lectura->save();
+            $reservado = $this->billetera->reservar($lectura, $c->consultante);
 
-            return [$c, $lectura, $anterior];
+            return [$c, $lectura, $anterior, $cobrado, $reservado];
         });
 
         $this->emitir(new PedidoResuelto($consulta->uuid, $pedido->id, EstadoPedido::Aceptado->value));
         if ($anterior) {
             $this->emitir(new EstadoCambiado($consulta->uuid, $anterior->id, EstadoLectura::Cerrada->value));
             $this->chat->sistema($consulta, "Se cerró la lectura: {$anterior->tipo->nombre()}.");
+            $this->avisarCobro($consulta, $cobrado);
         }
         $this->emitir(new LecturaIniciada($consulta->uuid, $lectura));
         $this->chat->sistema($consulta, "{$consulta->tarotista->name} aceptó: {$lectura->tipo->nombre()}.");
+        if ($reservado > 0) {
+            $this->chat->sistema($consulta, "Se reservaron {$reservado} créditos: se cobran al cerrar la lectura.");
+        }
 
         return $lectura;
     }
@@ -122,7 +130,7 @@ class ConsultaService
     /** Cerrar la lectura terminada (Abierta o Calculada → Cerrada): se puede pedir otra. */
     public function cerrarLectura(Lectura $lectura): Lectura
     {
-        [$lectura, $sinEfecto] = DB::transaction(function () use ($lectura) {
+        [$lectura, $sinEfecto, $cobrado] = DB::transaction(function () use ($lectura) {
             $this->bloquear($lectura->consulta)->exigirEstado(EstadoConsulta::Activa);
             $l = Lectura::whereKey($lectura->id)->lockForUpdate()->firstOrFail();
             $l->exigirEstado(EstadoLectura::Abierta, EstadoLectura::Calculada);
@@ -130,11 +138,12 @@ class ConsultaService
             $l->cerrada_at = now();
             $l->save();
 
-            return [$l, $this->anularAclaratoriasPendientes($l)];
+            return [$l, $this->anularAclaratoriasPendientes($l), $this->billetera->cobrar($l)];
         });
 
         $this->emitir(new EstadoCambiado($lectura->consulta->uuid, $lectura->id, EstadoLectura::Cerrada->value));
         $this->chat->sistema($lectura->consulta, "Se cerró la lectura: {$lectura->tipo->nombre()}.");
+        $this->avisarCobro($lectura->consulta, $cobrado);
         $this->avisarAclaratoriasAnuladas($lectura->consulta, $sinEfecto);
 
         return $lectura;
@@ -179,16 +188,20 @@ class ConsultaService
      */
     public function finalizar(Consulta $consulta): Consulta
     {
-        $consulta = DB::transaction(function () use ($consulta) {
+        [$consulta, $creditos] = DB::transaction(function () use ($consulta) {
             $c = $this->bloquear($consulta);
             $c->pasarA(EstadoConsulta::Finalizada);
             $c->finalizada_at = now();
             $c->save();
-            $this->interrumpirLectura($c);
 
-            return $c;
+            return [$c, $this->interrumpirLectura($c)];
         });
 
+        [$cobrado, $liberado] = $creditos;
+        $this->avisarCobro($consulta, $cobrado);
+        if ($liberado) {
+            $this->chat->sistema($consulta, "La lectura quedó sin terminar: se devolvieron {$liberado} créditos.");
+        }
         $this->chat->sistema($consulta, 'La consulta terminó.');
         $this->emitir(new ConsultaFinalizada($consulta->uuid, route('consultas.resumen', $consulta)));
 
@@ -271,16 +284,32 @@ class ConsultaService
         ];
     }
 
-    private function interrumpirLectura(Consulta $consulta): void
+    /**
+     * Cierra la lectura activa al finalizar. Si estaba terminada, se cobra como si la
+     * hubieran cerrado; si quedó a medias, los créditos vuelven a quien consulta.
+     *
+     * @return array{0: int|null, 1: int|null} [cobrado, liberado]
+     */
+    private function interrumpirLectura(Consulta $consulta): array
     {
         $lectura = $consulta->lecturaActiva()->lockForUpdate()->first();
         if ($lectura === null) {
-            return;
+            return [null, null];
         }
 
+        $terminada = $lectura->terminada();
         $lectura->pasarA(EstadoLectura::Cerrada);
         $lectura->cerrada_at = now();
         $lectura->save();
+
+        return $terminada ? [$this->billetera->cobrar($lectura), null] : [null, $this->billetera->liberar($lectura)];
+    }
+
+    private function avisarCobro(Consulta $consulta, ?int $cobrado): void
+    {
+        if ($cobrado) {
+            $this->chat->sistema($consulta, "Se cobraron {$cobrado} créditos de la lectura.");
+        }
     }
 
     private function bloquear(Consulta $consulta): Consulta

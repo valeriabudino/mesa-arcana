@@ -27,12 +27,15 @@ class ColaService
 {
     use EmiteEventos;
 
+    public function __construct(private BilleteraService $billetera) {}
+
     /** Una visitante escribe su nombre: se crea su usuaria invitada (sin email ni contraseña). */
     public function crearInvitada(string $nombre): User
     {
         $invitada = new User(['name' => $nombre]);
         $invitada->rol = Rol::Consultante;
         $invitada->save();
+        $this->billetera->regalar($invitada);
 
         return $invitada;
     }

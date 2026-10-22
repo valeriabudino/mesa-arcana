@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoCobro;
 use App\Enums\EstadoLectura;
 use App\Enums\TipoLectura;
 use App\Models\Concerns\TieneMaquinaDeEstados;
@@ -34,6 +35,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $cerrada_at
+ * @property int|null $precio (en créditos; null = lectura de antes de la billetera)
+ * @property EstadoCobro|null $estado_cobro
  */
 #[Fillable(['tipo', 'pregunta_id'])] // estado, orden_mazo y resultado los manejan solo los servicios
 #[Hidden(['orden_mazo', 'interpretacion_borrador'])] // NUNCA se serializa: ni en eventos ni en vistas
@@ -51,6 +54,7 @@ class Lectura extends Model
             'datos_nacimiento' => 'array',
             'resultado' => 'array',
             'cerrada_at' => 'datetime',
+            'estado_cobro' => EstadoCobro::class,
         ];
     }
 

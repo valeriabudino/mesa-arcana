@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
  * @property string|null $email
  * @property Rol $rol
  * @property bool $disponible (solo tarotistas: puede tomar turnos)
+ * @property int $saldo_disponible (créditos: los cambia solo BilleteraService)
+ * @property int $saldo_reservado (créditos apartados para una lectura en curso)
  * @property Carbon|null $email_verified_at
  * @property string|null $password
  * @property string|null $two_factor_secret
@@ -46,6 +48,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'rol' => Rol::class,
             'disponible' => 'boolean',
+            'saldo_disponible' => 'integer',
+            'saldo_reservado' => 'integer',
         ];
     }
 

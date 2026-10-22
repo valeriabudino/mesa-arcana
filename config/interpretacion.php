@@ -7,7 +7,7 @@ return [
 
     // Proveedor y modelo de Prism. Groq es gratis para desarrollo (la clave va en GROQ_API_KEY).
     'proveedor' => env('INTERPRETACION_PROVEEDOR', 'groq'),
-    'modelo' => env('INTERPRETACION_MODELO', 'llama-3.3-70b-versatile'),
+    'modelo' => env('INTERPRETACION_MODELO', 'openai/gpt-oss-120b'),
 
     // Si la IA no terminó en este tiempo, se usa la base.
     'timeout' => (int) env('INTERPRETACION_TIMEOUT', 20),

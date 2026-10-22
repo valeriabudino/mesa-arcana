@@ -136,7 +136,7 @@ it('el interpretador de Groq escribe en streaming con los límites del plan en e
     $fake = Prism::fake([TextResponseFake::make()->withText('Hoy El Mago te invita a animarte.')]);
     $avances = [];
 
-    $texto = (new InterpretadorIA('groq', 'llama-3.3-70b-versatile', 20, 0))->interpretar(
+    $texto = (new InterpretadorIA('groq', 'openai/gpt-oss-120b', 20, 0))->interpretar(
         ['tipo' => 'Sí o no', 'tema' => 'General', 'pregunta' => '¿Me conviene tomar la decisión?', 'respuesta' => 'Sí',
             'cartas' => [['posicion' => 'Respuesta', 'nombre' => 'El Mago', 'invertida' => false, 'significado' => 'Acción.', 'aclara' => null]]],
         function (string $parcial) use (&$avances) {

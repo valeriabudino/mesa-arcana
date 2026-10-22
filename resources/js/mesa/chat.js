@@ -5,6 +5,8 @@
 // Regla de seguridad: TODO lo que escribió una persona se pone con textContent,
 // nunca con innerHTML. Así "<img onerror=…>" se ve como texto y no se ejecuta.
 
+import { alternarLectura, hayVoz } from './voz.js';
+
 const $ = (selector) => document.querySelector(selector);
 
 // En el celu el chat va abajo y puede estar plegado (solo se ve la barra).
@@ -97,10 +99,17 @@ export function crearChat(config, { alEnviar, alResponderPedido, alEscribir, nom
         if (m.tipo === 'interpretacion') {
             li.className = 'flex justify-center';
             const caja = tarjeta('space-y-1');
-            caja.append(
-                titulo(`✨ Interpretación de ${m.autor?.nombre ?? 'la tarotista'}`),
-                nodo('p', 'whitespace-pre-wrap break-words', m.contenido),
-            );
+            const encabezado = nodo('div', 'flex items-center gap-2');
+            encabezado.append(titulo(`✨ Interpretación de ${m.autor?.nombre ?? 'la tarotista'}`));
+            if (hayVoz) {
+                const escuchar = nodo('button', 'ml-auto shrink-0 rounded-full border border-[#C9A54C]/60 px-2.5 py-0.5 text-xs text-[#C9A54C] hover:bg-[#3A2A63]');
+                escuchar.type = 'button';
+                escuchar.textContent = '🔊 Escuchar';
+                escuchar.setAttribute('aria-pressed', 'false');
+                escuchar.addEventListener('click', () => alternarLectura(m.contenido, escuchar));
+                encabezado.append(escuchar);
+            }
+            caja.append(encabezado, nodo('p', 'whitespace-pre-wrap break-words', m.contenido));
             li.append(caja);
 
             return li;
